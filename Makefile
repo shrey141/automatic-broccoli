@@ -1,4 +1,4 @@
-.PHONY: help test build run clean tf-init tf-plan tf-apply tf-destroy scan-container scan-deps lint format version
+.PHONY: help test build run clean tf-init tf-plan tf-apply tf-destroy scan-container scan-deps lint format version bootstrap-common destroy-common
 
 # Default environment
 ENV ?= dev
@@ -157,4 +157,27 @@ bootstrap-common: ## Bootstrap common infrastructure (ECR, OIDC, S3) - ONE TIME 
 	@echo "  3. Use GitHub Actions to deploy application:"
 	@echo "     - Push app changes to trigger app-cd.yml"
 	@echo "     - Or manually trigger via GitHub UI"
+
+destroy-common: ## Destroy common infrastructure (ECR, OIDC, S3) - DESTRUCTIVE!
+	@echo "\033[1;31m⚠️  WARNING: This will destroy ALL common infrastructure!\033[0m"
+	@echo "\033[1;31m⚠️  This includes:\033[0m"
+	@echo "\033[1;31m    - ECR repository and all container images\033[0m"
+	@echo "\033[1;31m    - OIDC provider and IAM role for GitHub Actions\033[0m"
+	@echo "\033[1;31m    - S3 bucket for Terraform state\033[0m"
+	@echo ""
+	@echo "\033[1;33m→ Make sure all environments (dev/staging/prod) are destroyed first!\033[0m"
+	@echo "\033[1;33m→ Type 'destroy-common' to confirm, or press Ctrl+C to cancel:\033[0m"
+	@read confirmation; \
+	if [ "$$confirmation" != "destroy-common" ]; then \
+		echo "\033[1;31m✗ Confirmation failed. Aborting.\033[0m"; \
+		exit 1; \
+	fi
+	$(MAKE) tf-init ENV=common
+	@echo "\033[1;34m→ Planning destruction of common infrastructure...\033[0m"
+	cd terraform/environments/common && terraform plan -destroy -out=tfplan
+	@echo ""
+	@echo "\033[1;33m→ Review the destruction plan above. Press ENTER to destroy or Ctrl+C to cancel\033[0m"
+	@read dummy
+	cd terraform/environments/common && terraform apply tfplan
+	@echo "\033[1;32m✓ Common infrastructure destroyed!\033[0m"
 

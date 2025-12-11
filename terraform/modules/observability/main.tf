@@ -85,8 +85,6 @@ resource "aws_cloudwatch_metric_alarm" "ecs_memory_high" {
 
 # ALB Target 5xx Errors
 resource "aws_cloudwatch_metric_alarm" "alb_target_5xx" {
-  count = var.alb_arn != "" ? 1 : 0
-
   alarm_name          = "${var.environment}-${var.service_name}-alb-5xx-errors"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 2
@@ -110,8 +108,6 @@ resource "aws_cloudwatch_metric_alarm" "alb_target_5xx" {
 
 # ALB Unhealthy Target Count
 resource "aws_cloudwatch_metric_alarm" "unhealthy_targets" {
-  count = var.target_group_arn != "" ? 1 : 0
-
   alarm_name          = "${var.environment}-${var.service_name}-unhealthy-targets"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 2
@@ -160,8 +156,6 @@ resource "aws_cloudwatch_metric_alarm" "service_down" {
 
 # CloudWatch Log Metric Filter for Application Errors
 resource "aws_cloudwatch_log_metric_filter" "application_errors" {
-  count = var.log_group_name != "" ? 1 : 0
-
   name           = "${var.environment}-${var.service_name}-errors"
   log_group_name = var.log_group_name
   pattern        = "{ $.level = \"ERROR\" }"
@@ -174,8 +168,6 @@ resource "aws_cloudwatch_log_metric_filter" "application_errors" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "application_errors" {
-  count = var.log_group_name != "" ? 1 : 0
-
   alarm_name          = "${var.environment}-${var.service_name}-application-errors"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 1
