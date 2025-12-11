@@ -21,6 +21,7 @@ class Config:
     if APP_VERSION is None:
         try:
             from importlib.metadata import version
+
             APP_VERSION = version("demo-app")
         except Exception:
             APP_VERSION = "unknown"
