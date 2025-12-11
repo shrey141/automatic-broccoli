@@ -80,7 +80,7 @@ jobs:
             --output-file-path console,checkov-results.json
 
       - name: Upload Checkov results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: checkov-results
@@ -184,7 +184,7 @@ jobs:
           fi
 
       - name: Upload OPA results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: opa-results-${{ matrix.environment }}
@@ -220,7 +220,7 @@ jobs:
           terraform plan -no-color -out=tfplan 2>&1 | tee plan-output.txt
 
       - name: Upload plan
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: tfplan-${{ matrix.environment }}
           path: |

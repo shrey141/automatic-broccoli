@@ -125,17 +125,17 @@ module "ecs_service" {
 module "observability" {
   source = "../../modules/observability"
 
-  environment        = var.environment
-  service_name       = "demo-app"
-  ecs_cluster_name   = module.ecs_cluster.cluster_name
-  ecs_service_name   = module.ecs_service.service_name
-  alb_arn            = module.alb.alb_arn
-  target_group_arn   = module.alb.target_group_arn
-  log_group_name     = module.ecs_service.log_group_name
-  alert_email        = var.alert_email
+  environment            = var.environment
+  service_name           = "demo-app"
+  ecs_cluster_name       = module.ecs_cluster.cluster_name
+  ecs_service_name       = module.ecs_service.service_name
+  alb_arn                = module.alb.alb_arn
+  target_group_arn       = module.alb.target_group_arn
+  log_group_name         = module.ecs_service.log_group_name
+  alert_email            = var.alert_email
   cpu_alarm_threshold    = 70 # More conservative in production
   memory_alarm_threshold = 75
-  error_rate_threshold   = 5  # Lower tolerance for errors
+  error_rate_threshold   = 5 # Lower tolerance for errors
 
   tags = local.common_tags
 }

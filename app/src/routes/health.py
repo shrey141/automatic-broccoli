@@ -20,13 +20,18 @@ def health():
     Returns:
         JSON response with health status and metadata.
     """
-    return jsonify({
-        "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat() + "Z",
-        "service": current_app.config.get("APP_NAME", "demo-app"),
-        "version": current_app.config.get("APP_VERSION", "unknown"),
-        "environment": current_app.config.get("ENVIRONMENT", "unknown"),
-    }), 200
+    return (
+        jsonify(
+            {
+                "status": "healthy",
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "service": current_app.config.get("APP_NAME", "demo-app"),
+                "version": current_app.config.get("APP_VERSION", "unknown"),
+                "environment": current_app.config.get("ENVIRONMENT", "unknown"),
+            }
+        ),
+        200,
+    )
 
 
 @bp.route("/health/ready", methods=["GET"])
@@ -54,11 +59,16 @@ def ready():
     all_ready = all(status == "ok" for status in checks.values())
     status_code = 200 if all_ready else 503
 
-    return jsonify({
-        "status": "ready" if all_ready else "not_ready",
-        "checks": checks,
-        "timestamp": datetime.utcnow().isoformat() + "Z",
-    }), status_code
+    return (
+        jsonify(
+            {
+                "status": "ready" if all_ready else "not_ready",
+                "checks": checks,
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+            }
+        ),
+        status_code,
+    )
 
 
 @bp.route("/health/live", methods=["GET"])
@@ -71,7 +81,12 @@ def live():
     Returns:
         JSON response with liveness status.
     """
-    return jsonify({
-        "status": "alive",
-        "timestamp": datetime.utcnow().isoformat() + "Z",
-    }), 200
+    return (
+        jsonify(
+            {
+                "status": "alive",
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+            }
+        ),
+        200,
+    )

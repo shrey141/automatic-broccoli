@@ -122,9 +122,7 @@ class TestAPIEndpoints:
         """Test /api/echo endpoint."""
         payload = {"test": "data", "number": 42}
         response = client.post(
-            "/api/echo",
-            data=json.dumps(payload),
-            content_type="application/json"
+            "/api/echo", data=json.dumps(payload), content_type="application/json"
         )
         assert response.status_code == 200
         data = response.get_json()

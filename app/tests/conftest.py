@@ -12,10 +12,12 @@ def app():
         Flask application configured for testing.
     """
     app = create_app("dev")
-    app.config.update({
-        "TESTING": True,
-        "ENABLE_CLOUDWATCH": False,  # Disable CloudWatch in tests
-    })
+    app.config.update(
+        {
+            "TESTING": True,
+            "ENABLE_CLOUDWATCH": False,  # Disable CloudWatch in tests
+        }
+    )
     return app
 
 

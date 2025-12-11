@@ -96,21 +96,21 @@ module "alb" {
 module "ecs_service" {
   source = "../../modules/ecs-service"
 
-  environment            = var.environment
-  service_name           = "demo-app"
-  cluster_id             = module.ecs_cluster.cluster_id
-  cluster_name           = module.ecs_cluster.cluster_name
-  vpc_id                 = module.networking.vpc_id
-  private_subnets        = module.networking.private_subnet_ids
-  target_group_arn       = module.alb.target_group_arn
-  alb_security_group_id  = module.alb.alb_security_group_id
-  container_image        = "${module.ecr.repository_url}:latest"
-  container_port         = 8080
-  task_cpu               = var.ecs_task_cpu
-  task_memory            = var.ecs_task_memory
-  desired_count          = var.ecs_desired_count
-  app_version            = var.app_version
-  log_retention_days     = 7
+  environment              = var.environment
+  service_name             = "demo-app"
+  cluster_id               = module.ecs_cluster.cluster_id
+  cluster_name             = module.ecs_cluster.cluster_name
+  vpc_id                   = module.networking.vpc_id
+  private_subnets          = module.networking.private_subnet_ids
+  target_group_arn         = module.alb.target_group_arn
+  alb_security_group_id    = module.alb.alb_security_group_id
+  container_image          = "${module.ecr.repository_url}:latest"
+  container_port           = 8080
+  task_cpu                 = var.ecs_task_cpu
+  task_memory              = var.ecs_task_memory
+  desired_count            = var.ecs_desired_count
+  app_version              = var.app_version
+  log_retention_days       = 7
   autoscaling_min_capacity = 1
   autoscaling_max_capacity = 4
 
@@ -123,14 +123,14 @@ module "ecs_service" {
 module "observability" {
   source = "../../modules/observability"
 
-  environment        = var.environment
-  service_name       = "demo-app"
-  ecs_cluster_name   = module.ecs_cluster.cluster_name
-  ecs_service_name   = module.ecs_service.service_name
-  alb_arn            = module.alb.alb_arn
-  target_group_arn   = module.alb.target_group_arn
-  log_group_name     = module.ecs_service.log_group_name
-  alert_email        = var.alert_email
+  environment            = var.environment
+  service_name           = "demo-app"
+  ecs_cluster_name       = module.ecs_cluster.cluster_name
+  ecs_service_name       = module.ecs_service.service_name
+  alb_arn                = module.alb.alb_arn
+  target_group_arn       = module.alb.target_group_arn
+  log_group_name         = module.ecs_service.log_group_name
+  alert_email            = var.alert_email
   cpu_alarm_threshold    = 80
   memory_alarm_threshold = 85
   error_rate_threshold   = 10
