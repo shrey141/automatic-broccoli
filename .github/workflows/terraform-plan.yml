@@ -1,0 +1,290 @@
+name: Terraform Plan & Policy Check
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'terraform/**'
+      - '.github/workflows/terraform-plan.yml'
+  push:
+    branches: [ main ]
+    paths:
+      - 'terraform/**'
+
+env:
+  TF_VERSION: '1.5.0'
+  AWS_REGION: us-east-1
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  id-token: write
+
+jobs:
+  # Format and validation
+  validate:
+    name: Terraform Validate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Format Check
+        run: |
+          terraform fmt -check -recursive terraform/
+        continue-on-error: true
+
+      - name: Terraform Init (all environments)
+        run: |
+          set -e
+          for env in dev staging prod; do
+            echo "Initializing $env environment..."
+            cd terraform/environments/$env
+            terraform init -backend=false
+            cd ../../..
+            echo "✓ $env initialized"
+          done
+
+      - name: Terraform Validate (all environments)
+        run: |
+          for env in dev staging prod; do
+            echo "Validating $env environment..."
+            cd terraform/environments/$env
+            terraform validate
+            cd ../../..
+          done
+
+  # Checkov security scanning
+  checkov:
+    name: Checkov IaC Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: terraform/
+          config_file: terraform/policies/checkov/.checkov.yaml
+          soft_fail: true
+          output_format: cli,json
+          output_file_path: console,checkov-results.json
+
+      - name: Upload Checkov results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: checkov-results
+          path: checkov-results.json
+
+      - name: Comment Checkov results on PR
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        continue-on-error: true
+        with:
+          script: |
+            const fs = require('fs');
+
+            // Check if results file exists
+            if (!fs.existsSync('checkov-results.json')) {
+              console.log('No Checkov results file found');
+              return;
+            }
+
+            const results = JSON.parse(fs.readFileSync('checkov-results.json', 'utf8'));
+            const summary = results.summary || {};
+            const passed = summary.passed || 0;
+            const failed = summary.failed || 0;
+            const skipped = summary.skipped || 0;
+
+            const commentIdentifier = '<!-- checkov-scan-results -->';
+            const body = `${commentIdentifier}
+            ## 🔒 Checkov Security Scan Results
+
+            | Status | Count |
+            |--------|-------|
+            | ✅ Passed | ${passed} |
+            | ❌ Failed | ${failed} |
+            | ⏭️  Skipped | ${skipped} |
+
+            ${failed > 0 ? '⚠️ **Security issues detected!** Review the workflow logs for details.' : '✅ **No security issues detected!**'}
+            `;
+
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+
+            const existingComment = comments.find(comment =>
+              comment.body.includes(commentIdentifier)
+            );
+
+            if (existingComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                comment_id: existingComment.id,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: body
+              });
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: body
+              });
+            }
+
+  # Terraform plan for each environment
+  plan:
+    name: Plan (${{ matrix.environment }})
+    runs-on: ubuntu-latest
+    needs: [validate, checkov]
+
+    strategy:
+      matrix:
+        environment: [dev, staging, prod]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: |
+          cd terraform/environments/${{ matrix.environment }}
+          terraform init
+
+      - name: Terraform Plan
+        run: |
+          cd terraform/environments/${{ matrix.environment }}
+          terraform plan -no-color -out=tfplan 2>&1 | tee plan-output.txt
+
+      - name: Upload plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-${{ matrix.environment }}
+          path: |
+            terraform/environments/${{ matrix.environment }}/tfplan
+            terraform/environments/${{ matrix.environment }}/plan-output.txt
+
+      - name: Comment plan on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const planOutput = fs.readFileSync('terraform/environments/${{ matrix.environment }}/plan-output.txt', 'utf8');
+
+            // Truncate if too long (GitHub has a comment size limit)
+            const maxLength = 65000;
+            const output = planOutput.length > maxLength
+              ? planOutput.substring(0, maxLength) + '\n\n... (truncated)'
+              : planOutput;
+
+            const commentIdentifier = '<!-- terraform-plan-${{ matrix.environment }} -->';
+            const body = `${commentIdentifier}
+            ## 📋 Terraform Plan - ${{ matrix.environment }}
+
+            <details>
+            <summary>Click to expand plan</summary>
+
+            \`\`\`terraform
+            ${output}
+            \`\`\`
+
+            </details>
+            `;
+
+            // Find existing comment for this environment
+            const { data: comments } = await github.rest.issues.listComments({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+
+            const existingComment = comments.find(comment =>
+              comment.body.includes(commentIdentifier)
+            );
+
+            if (existingComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                comment_id: existingComment.id,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: body
+              });
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: body
+              });
+            }
+
+  # Summary of all checks
+  summary:
+    name: Policy Check Summary
+    runs-on: ubuntu-latest
+    needs: [validate, checkov, plan]
+    if: always()
+
+    steps:
+      - name: Check results
+        run: |
+          echo "## Policy Check Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.validate.result }}" == "success" ]; then
+            echo "✅ Terraform validation passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Terraform validation failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.checkov.result }}" == "success" ]; then
+            echo "✅ Checkov security scan passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Checkov security scan had issues (soft-fail enabled)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.plan.result }}" == "success" ]; then
+            echo "✅ Terraform plan succeeded for all environments" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Terraform plan failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "View detailed results in the job logs above." >> $GITHUB_STEP_SUMMARY
+
+      - name: Fail if critical checks failed
+        if: needs.validate.result != 'success'
+        run: |
+          echo "❌ Critical checks failed!"
+          exit 1

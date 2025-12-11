@@ -1,0 +1,20 @@
+# Example Terraform variables for staging environment
+# Copy this file to terraform.tfvars and customize
+
+environment = "staging"
+aws_region  = "us-east-1"
+
+# Networking
+vpc_cidr           = "10.1.0.0/16"
+enable_nat_gateway = true
+
+# ECS Configuration (higher resources than dev)
+ecs_task_cpu       = 512   # 0.5 vCPU
+ecs_task_memory    = 1024  # 1 GB
+ecs_desired_count  = 2     # Minimum 2 tasks for HA
+
+# Application
+app_version = "1.0.0"
+
+# Alerts
+alert_email = "team@example.com"  # Replace with your email

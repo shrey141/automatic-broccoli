@@ -1,0 +1,56 @@
+# Checkov Configuration for Terraform Security Scanning
+# https://www.checkov.io/2.Basics/CLI%20Command%20Reference.html
+
+# Framework to scan
+framework:
+  - terraform
+
+# Output format
+output: cli
+
+# Fail on severity
+compact: false
+quiet: false
+
+# Skip specific checks (with justification)
+# NOTE: By default, Checkov runs ALL checks. We only skip ones that don't apply to this demo.
+skip-check:
+  # We're using HTTP for demo purposes (not production)
+  - CKV_AWS_2    # ALB HTTPS listener (demo uses HTTP)
+  - CKV_AWS_103  # ALB TLS 1.2 (demo uses HTTP)
+
+  # CloudWatch log encryption - adding later for cost optimization
+  - CKV_AWS_338  # 1-year log retention (too long for demo dev environment)
+  - CKV_AWS_158  # CloudWatch log groups encryption (adds cost for demo)
+
+  # Not applicable to this demo
+  - CKV_AWS_40   # IAM password policy (we're not using IAM users)
+  - CKV_AWS_144  # S3 cross-region replication (single region demo)
+
+  # Expected for public-facing demo application
+  - CKV_AWS_260  # Port 80 from 0.0.0.0/0 (we need this for public demo ALB)
+  - CKV_AWS_24   # SSH access (not relevant, we don't have SSH ports)
+  - CKV_AWS_25   # RDP access (not relevant, we don't have RDP ports)
+
+  # Optional enhancements (not required for demo)
+  - CKV_AWS_91   # ALB access logging (adds cost, not needed for demo)
+  - CKV_AWS_18   # S3 access logging (no S3 in this demo yet)
+
+  # Container insights and advanced features
+  - CKV_AWS_65   # ECS cluster container insights (adds cost for demo)
+
+# Severity levels to fail on
+# Options: CRITICAL, HIGH, MEDIUM, LOW
+# For production, use: soft-fail: false
+# For demo/development, we'll be lenient
+soft-fail: true
+
+# Directories to exclude
+skip-path:
+  - .terraform/
+  - .terragrunt-cache/
+  - terraform/policies/  # Don't scan policy files themselves
+
+# Additional settings
+download-external-modules: false
+evaluate-variables: true

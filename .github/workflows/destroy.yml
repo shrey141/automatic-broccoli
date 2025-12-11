@@ -1,0 +1,82 @@
+name: Destroy Infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to destroy'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+          - common
+          - all
+      confirm:
+        description: 'Type "DESTROY" to confirm'
+        required: true
+        default: ''
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  destroy-apps:
+    name: Destroy ${{ matrix.env }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        env: [dev, staging, prod]
+    if: ${{ github.event.inputs.confirm == 'DESTROY' && (github.event.inputs.environment == 'all' || github.event.inputs.environment == matrix.env) }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: |
+          cd terraform/environments/${{ matrix.env }}
+          terraform init
+
+      - name: Terraform Destroy
+        run: |
+          cd terraform/environments/${{ matrix.env }}
+          terraform destroy -auto-approve
+
+  destroy-common:
+    name: Destroy Common
+    needs: destroy-apps
+    if: ${{ always() && github.event.inputs.confirm == 'DESTROY' && (github.event.inputs.environment == 'all' || github.event.inputs.environment == 'common') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: |
+          cd terraform/environments/common
+          terraform init
+
+      - name: Terraform Destroy
+        run: |
+          cd terraform/environments/common
+          terraform destroy -auto-approve

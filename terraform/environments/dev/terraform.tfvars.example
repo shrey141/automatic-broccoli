@@ -1,0 +1,20 @@
+# Example Terraform variables for dev environment
+# Copy this file to terraform.tfvars and customize
+
+environment = "dev"
+aws_region  = "us-east-1"
+
+# Networking
+vpc_cidr           = "10.0.0.0/16"
+enable_nat_gateway = true # Set to false to save costs, tasks won't have internet access
+
+# ECS Configuration
+ecs_task_cpu       = 256  # 0.25 vCPU
+ecs_task_memory    = 512  # 512 MB
+ecs_desired_count  = 2    # Number of tasks
+
+# Application
+app_version = "1.0.0"
+
+# Alerts (optional for dev)
+# alert_email = "dev-team@example.com"
