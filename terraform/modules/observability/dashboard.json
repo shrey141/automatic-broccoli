@@ -4,8 +4,8 @@
       "type": "metric",
       "properties": {
         "metrics": [
-          [ "AWS/ECS", "CPUUtilization", { "stat": "Average", "dimensions": { "ServiceName": "${service_name}", "ClusterName": "${cluster_name}" } } ],
-          [ ".", "MemoryUtilization", { ".", ".", ".", "." } ]
+          [ "AWS/ECS", "CPUUtilization", "ServiceName", "${service_name}", "ClusterName", "${cluster_name}", { "stat": "Average" } ],
+          [ ".", "MemoryUtilization", "ServiceName", "${service_name}", "ClusterName", "${cluster_name}", { "stat": "Average" } ]
         ],
         "view": "timeSeries",
         "stacked": false,
@@ -24,8 +24,8 @@
       "type": "metric",
       "properties": {
         "metrics": [
-          [ "ECS/ContainerInsights", "RunningTaskCount", { "stat": "Average", "dimensions": { "ServiceName": "${service_name}", "ClusterName": "${cluster_name}" } } ],
-          [ ".", "DesiredTaskCount", { ".", ".", ".", "." } ]
+          [ "ECS/ContainerInsights", "RunningTaskCount", "ServiceName", "${service_name}", "ClusterName", "${cluster_name}", { "stat": "Average" } ],
+          [ ".", "DesiredTaskCount", "ServiceName", "${service_name}", "ClusterName", "${cluster_name}", { "stat": "Average" } ]
         ],
         "view": "timeSeries",
         "stacked": false,
@@ -38,10 +38,10 @@
       "type": "metric",
       "properties": {
         "metrics": [
-          [ "AWS/ApplicationELB", "RequestCount", { "stat": "Sum", "dimensions": { "LoadBalancer": "${alb_arn_suffix}" } } ],
-          [ ".", "HTTPCode_Target_2XX_Count", { ".", ".", ".", "." } ],
-          [ ".", "HTTPCode_Target_4XX_Count", { ".", ".", ".", "." } ],
-          [ ".", "HTTPCode_Target_5XX_Count", { ".", ".", ".", "." } ]
+          [ "AWS/ApplicationELB", "RequestCount", "LoadBalancer", "${alb_arn_suffix}", { "stat": "Sum" } ],
+          [ ".", "HTTPCode_Target_2XX_Count", "LoadBalancer", "${alb_arn_suffix}", { "stat": "Sum" } ],
+          [ ".", "HTTPCode_Target_4XX_Count", "LoadBalancer", "${alb_arn_suffix}", { "stat": "Sum" } ],
+          [ ".", "HTTPCode_Target_5XX_Count", "LoadBalancer", "${alb_arn_suffix}", { "stat": "Sum" } ]
         ],
         "view": "timeSeries",
         "stacked": false,
@@ -54,7 +54,7 @@
       "type": "metric",
       "properties": {
         "metrics": [
-          [ "AWS/ApplicationELB", "TargetResponseTime", { "stat": "Average", "dimensions": { "LoadBalancer": "${alb_arn_suffix}" } } ],
+          [ "AWS/ApplicationELB", "TargetResponseTime", "LoadBalancer", "${alb_arn_suffix}", { "stat": "Average" } ],
           [ "...", { "stat": "p50" } ],
           [ "...", { "stat": "p99" } ]
         ],
@@ -74,8 +74,8 @@
       "type": "metric",
       "properties": {
         "metrics": [
-          [ "AWS/ApplicationELB", "HealthyHostCount", { "stat": "Average", "dimensions": { "TargetGroup": "${target_group_arn}", "LoadBalancer": "${alb_arn_suffix}" } } ],
-          [ ".", "UnHealthyHostCount", { ".", ".", ".", "." } ]
+          [ "AWS/ApplicationELB", "HealthyHostCount", "TargetGroup", "${target_group_arn}", "LoadBalancer", "${alb_arn_suffix}", { "stat": "Average" } ],
+          [ ".", "UnHealthyHostCount", "TargetGroup", "${target_group_arn}", "LoadBalancer", "${alb_arn_suffix}", { "stat": "Average" } ]
         ],
         "view": "timeSeries",
         "stacked": false,

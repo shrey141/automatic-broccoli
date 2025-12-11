@@ -15,12 +15,12 @@ output "sns_topic_arn" {
 
 output "alarm_names" {
   description = "List of CloudWatch alarm names"
-  value = concat(
-    [aws_cloudwatch_metric_alarm.ecs_cpu_high.alarm_name],
-    [aws_cloudwatch_metric_alarm.ecs_memory_high.alarm_name],
-    [aws_cloudwatch_metric_alarm.service_down.alarm_name],
-    aws_cloudwatch_metric_alarm.alb_target_5xx[*].alarm_name,
-    aws_cloudwatch_metric_alarm.unhealthy_targets[*].alarm_name,
-    aws_cloudwatch_metric_alarm.application_errors[*].alarm_name
-  )
+  value = [
+    aws_cloudwatch_metric_alarm.ecs_cpu_high.alarm_name,
+    aws_cloudwatch_metric_alarm.ecs_memory_high.alarm_name,
+    aws_cloudwatch_metric_alarm.service_down.alarm_name,
+    aws_cloudwatch_metric_alarm.alb_target_5xx.alarm_name,
+    aws_cloudwatch_metric_alarm.unhealthy_targets.alarm_name,
+    aws_cloudwatch_metric_alarm.application_errors.alarm_name
+  ]
 }
