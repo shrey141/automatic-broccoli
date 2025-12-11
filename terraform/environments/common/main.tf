@@ -72,3 +72,11 @@ module "ecr" {
   tags = local.common_tags
 }
 
+# WARNING: This gives the GitHub Actions role full admin access.
+# This is for demonstration purposes only. In a real-world scenario,
+# you should create a more restrictive, least-privilege IAM policy.
+# resource "aws_iam_role_policy_attachment" "github_actions_admin" {
+#   role       = module.oidc.role_name
+#   policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
+# }
+

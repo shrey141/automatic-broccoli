@@ -10,7 +10,7 @@ variable "enable_container_insights" {
 }
 
 variable "use_fargate_spot" {
-  description = "Use Fargate Spot for cost savings (recommended for dev/staging)"
+  description = "Use Fargate Spot for cost savings (recommended for dev)"
   type        = bool
   default     = false
 }

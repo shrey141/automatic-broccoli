@@ -1,32 +1,32 @@
-# Environment Comparison - Dev vs Staging vs Production
+# Environment Comparison - Dev vs Production
 
 ## Overview
 
-All three environments use the **same Terraform modules** but with different configurations. This demonstrates the DRY principle and shows how infrastructure as code enables environment parity with appropriate environment-specific tuning.
+Both environments use the **same Terraform modules** but with different configurations. This demonstrates the DRY principle and shows how infrastructure as code enables environment parity with appropriate environment-specific tuning.
 
 ## Quick Comparison Table
 
-| Feature | Dev | Staging | Production |
-|---------|-----|---------|------------|
-| **Purpose** | Development & testing | Pre-production validation | Live customer traffic |
-| **VPC CIDR** | 10.0.0.0/16 | 10.1.0.0/16 | 10.2.0.0/16 |
-| **Availability Zones** | 2 | 2 | 3 |
-| **NAT Gateway** | Yes | Yes | Yes |
-| **VPC Flow Logs** | No | No | Yes |
-| **Fargate Type** | **Spot** (70% cheaper) | Regular | Regular |
-| **Task CPU** | 256 (0.25 vCPU) | 512 (0.5 vCPU) | 1024 (1 vCPU) |
-| **Task Memory** | 512 MB | 1024 MB | 2048 MB |
-| **Desired Tasks** | 2 | 2 | 3 |
-| **Auto-scaling Min** | 1 | 2 | 3 |
-| **Auto-scaling Max** | 4 | 6 | 10 |
-| **Log Retention** | 7 days | 14 days | 30 days |
-| **ECR Repository** | Shared | Shared | Shared (30 images) |
-| **Deletion Protection** | Disabled | Disabled | Optional (recommended) |
-| **CPU Alarm Threshold** | 80% | 75% | 70% |
-| **Memory Alarm Threshold** | 85% | 80% | 75% |
-| **Error Rate Threshold** | 10 errors | 20 errors | 5 errors |
-| **Alerts Email** | Optional | Recommended | **Required** |
-| **Deployment Strategy** | Auto (cancel old) | Auto (queued) | Manual approval |
+| Feature | Dev | Production |
+|---------|-----|------------|
+| **Purpose** | Development & testing | Live customer traffic |
+| **VPC CIDR** | 10.0.0.0/16 | 10.2.0.0/16 |
+| **Availability Zones** | 2 | 3 |
+| **NAT Gateway** | Yes | Yes |
+| **VPC Flow Logs** | No | Yes |
+| **Fargate Type** | **Spot** (70% cheaper) | Regular |
+| **Task CPU** | 256 (0.25 vCPU) | 1024 (1 vCPU) |
+| **Task Memory** | 512 MB | 2048 MB |
+| **Desired Tasks** | 2 | 3 |
+| **Auto-scaling Min** | 1 | 3 |
+| **Auto-scaling Max** | 4 | 10 |
+| **Log Retention** | 7 days | 30 days |
+| **ECR Repository** | Shared | Shared (30 images) |
+| **Deletion Protection** | Disabled | Optional (recommended) |
+| **CPU Alarm Threshold** | 80% | 70% |
+| **Memory Alarm Threshold** | 85% | 75% |
+| **Error Rate Threshold** | 10 errors | 5 errors |
+| **Alerts Email** | Optional | **Required** |
+| **Deployment Strategy** | Auto (cancel old) | Manual approval |
 
 ## Estimated Monthly Costs
 
@@ -38,17 +38,6 @@ NAT Gateway:        2 AZs × 730 hrs × $0.045 + data                      ~$66/
 CloudWatch:         Logs (7 days) + Metrics + Alarms                    ~$5/month
 ────────────────────────────────────────────────────────────────────────────────
 TOTAL:                                                                   ~$100/month
-Note: ECR cost (~$0.60/month) shared across all environments
-```
-
-### Staging Environment
-```
-ECS Fargate:        2 tasks × 512 CPU × 1024 MB × 730 hrs × $0.04048640 = ~$59/month
-ALB:                                                                      ~$18/month
-NAT Gateway:        2 AZs                                                ~$66/month
-CloudWatch:         Logs (14 days) + Metrics + Alarms                   ~$8/month
-────────────────────────────────────────────────────────────────────────────────
-TOTAL:                                                                   ~$151/month
 Note: ECR cost (~$0.60/month) shared across all environments
 ```
 
@@ -70,7 +59,7 @@ S3 State Bucket:    Terraform state files                                 ~$0.10
 ────────────────────────────────────────────────────────────────────────────────
 ```
 
-**Annual Total: (~$570/month × 12) + $8.40 = ~$6,848/year**
+**Annual Total: (~$420/month × 12) + $8.40 = ~$5,048/year**
 
 ## Detailed Differences
 
@@ -84,15 +73,6 @@ desired_count   = 2     # Minimal HA
 use_fargate_spot = true # Cost savings
 ```
 **Rationale:** Developers need fast feedback, not production-level resources. Spot instances are acceptable because downtime doesn't affect customers.
-
-#### Staging
-```hcl
-ecs_task_cpu    = 512   # 2x dev
-ecs_task_memory = 1024  # 2x dev
-desired_count   = 2     # Same as prod start
-use_fargate_spot = false # Reliability for testing
-```
-**Rationale:** Should mirror production characteristics for realistic testing, but doesn't need full production scale.
 
 #### Production
 ```hcl
@@ -113,14 +93,6 @@ cpu_target = 70%               # Standard threshold
 ```
 **Behavior:** Aggressive scale-down to save costs. Limited scale-up because dev traffic is low.
 
-#### Staging
-```hcl
-autoscaling_min_capacity = 2   # Always maintain 2 tasks
-autoscaling_max_capacity = 6   # Moderate burst capacity
-cpu_target = 70%               # Standard threshold
-```
-**Behavior:** Maintains minimum HA, can handle moderate load testing.
-
 #### Production
 ```hcl
 autoscaling_min_capacity = 3   # Always maintain 3 tasks (1 per AZ)
@@ -137,13 +109,6 @@ cpu_target = 70%               # Triggers scaling earlier
 - **Memory Alarm:** 85% (relaxed)
 - **Error Rate:** 10 errors/5min (learning environment)
 - **Alerts:** Optional (Slack maybe)
-
-#### Staging
-- **Log Retention:** 14 days (investigate test failures)
-- **CPU Alarm:** 75% (moderate)
-- **Memory Alarm:** 80% (moderate)
-- **Error Rate:** 20 errors/5min (stress testing expected)
-- **Alerts:** Email to team
 
 #### Production
 - **Log Retention:** 30 days (compliance, debugging)
@@ -166,17 +131,6 @@ concurrency:
 - No approval required
 - Fast feedback loop
 
-#### Staging
-```yaml
-concurrency:
-  group: deploy-staging
-  cancel-in-progress: false  # Queue deployments
-```
-- Deploys automatically after dev success
-- Queues multiple deployments (tests all commits)
-- No approval required
-- Validates before production
-
 #### Production
 ```yaml
 concurrency:
@@ -186,7 +140,7 @@ environment:
   name: production
   # requires manual approval
 ```
-- Deploys only after staging success
+- Deploys only after dev success
 - Requires manual approval from team
 - Queues deployments, never cancels
 - Deliberate, controlled releases
@@ -198,12 +152,6 @@ environment:
 - **NAT Gateways:** 2 (one per AZ)
 - **VPC Flow Logs:** Disabled (cost savings)
 - **CIDR:** 10.0.0.0/16
-
-#### Staging
-- **AZs:** 2 (us-east-1a, us-east-1b)
-- **NAT Gateways:** 2 (one per AZ)
-- **VPC Flow Logs:** Disabled (cost savings)
-- **CIDR:** 10.1.0.0/16 (separate from dev)
 
 #### Production
 - **AZs:** 3 (us-east-1a, us-east-1b, us-east-1c)
@@ -218,12 +166,6 @@ environment:
 - **RTO:** 30 minutes (rebuild from scratch)
 - **RPO:** Acceptable data loss (no critical data)
 - **Rollback:** Revert git commit
-
-#### Staging
-- **Backup Strategy:** Terraform state + shared ECR images
-- **RTO:** 15 minutes (redeploy)
-- **RPO:** Minimal data loss
-- **Rollback:** Previous image tag
 
 #### Production
 - **Backup Strategy:** Terraform state + shared ECR images + logs
@@ -245,11 +187,9 @@ environment:
    ↓
 5. Deploy to Dev (automatic)
    ↓ (smoke tests pass)
-6. Deploy to Staging (automatic)
-   ↓ (integration tests pass)
-7. Deploy to Prod (manual approval)
+6. Deploy to Prod (manual approval)
    ↓ (production verification)
-8. Monitor CloudWatch dashboards
+7. Monitor CloudWatch dashboards
 ```
 
 ### Hotfix Flow
@@ -257,9 +197,8 @@ environment:
 1. Create hotfix branch from main
 2. Make minimal fix
 3. PR → merge to main
-4. Optional: Skip staging with workflow_dispatch
-5. Deploy directly to prod with approval
-6. Backport to develop
+4. Deploy directly to prod with approval
+5. Backport to develop
 ```
 
 ## Environment Isolation
@@ -274,13 +213,11 @@ environment:
 S3 Backend Structure:
 demo-app-terraform-state/
   ├── dev/terraform.tfstate
-  ├── staging/terraform.tfstate
   └── prod/terraform.tfstate
 
 DynamoDB Locks:
 demo-app-terraform-locks
   ├── dev/terraform.tfstate-md5
-  ├── staging/terraform.tfstate-md5
   └── prod/terraform.tfstate-md5
 ```
 
@@ -288,7 +225,6 @@ demo-app-terraform-locks
 ```
 GitHub Environments:
 - dev → DEV_AWS_ROLE_ARN
-- staging → STAGING_AWS_ROLE_ARN
 - production → PROD_AWS_ROLE_ARN (with approvals)
 ```
 
@@ -299,11 +235,6 @@ GitHub Environments:
 - ✅ Scale to 1 task during off-hours
 - ✅ Short log retention (7 days)
 - ✅ Consider stopping overnight (additional 66% savings)
-
-### Staging Environment
-- ✅ Use Reserved Capacity if running 24/7
-- ✅ Scale to minimum during off-hours
-- ⚠️ Don't use Spot (need reliability for testing)
 
 ### Production Environment
 - ✅ Use Savings Plans for predictable baseline
@@ -320,13 +251,6 @@ GitHub Environments:
 - ✅ Experimentation
 - ✅ Learning new tools
 
-### Use Staging For:
-- ✅ Final validation before production
-- ✅ Performance testing
-- ✅ Integration testing
-- ✅ Security testing
-- ✅ Customer demos (maybe)
-
 ### Use Production For:
 - ✅ Live customer traffic only
 - ⛔ Never for testing
@@ -341,12 +265,6 @@ make tf-init ENV=dev
 make tf-plan ENV=dev
 make tf-apply ENV=dev
 make deploy ENV=dev
-
-# Staging
-make tf-init ENV=staging
-make tf-plan ENV=staging
-make tf-apply ENV=staging
-make deploy ENV=staging
 
 # Production
 make tf-init ENV=prod
@@ -375,7 +293,7 @@ make deploy ENV=prod  # Will fail without manual approval in GitHub Actions
    - Auto-scaling prevents over-provisioning
 
 4. **"What's your deployment strategy?"**
-   - Progressive delivery (dev → staging → prod)
+   - Progressive delivery (dev → prod)
    - GitHub Environments with approval gates
    - Same image tag promoted through environments
    - Rollback capability at each stage
@@ -389,4 +307,4 @@ This multi-environment setup demonstrates:
 - ✅ **Platform Engineering:** Reusable, scalable patterns
 - ✅ **Production Thinking:** Proper observability and alerting
 
-All three environments are ready to deploy using the same Terraform modules with environment-specific variable files.
+Both environments are ready to deploy using the same Terraform modules with environment-specific variable files.

@@ -4,7 +4,7 @@
 environment = "prod"
 aws_region  = "us-east-1"
 
-# Networking (separate CIDR from dev/staging)
+# Networking (separate CIDR from dev)
 vpc_cidr           = "10.2.0.0/16"
 enable_nat_gateway = true
 

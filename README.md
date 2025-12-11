@@ -247,7 +247,7 @@ This repository includes a GitHub Actions workflow to safely destroy infrastruct
 1. Go to the **Actions** tab in GitHub
 2. Select **Destroy Infrastructure** from the workflows list
 3. Click **Run workflow**
-4. Select the environment to destroy (e.g., `dev`, `staging`, `prod`, `common`, or `all`)
+4. Select the environment to destroy (e.g., `dev`, `prod`, `common`, or `all`)
 5. Type `DESTROY` in the confirmation box
 6. Click **Run workflow**
 
@@ -293,7 +293,6 @@ aws dynamodb delete-table --table-name demo-app-terraform-locks --region us-east
 │   │
 │   └── environments/            # Environment-specific compositions
 │       ├── dev/                 # Development environment
-│       ├── staging/             # Staging environment (planned)
 │       └── prod/                # Production environment (planned)
 │
 ├── .github/                     # CI/CD pipelines (planned)

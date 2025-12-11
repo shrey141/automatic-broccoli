@@ -43,25 +43,25 @@ run-dev: ## Run application in development mode
 
 ##@ Infrastructure
 
-tf-init: ## Initialize Terraform for specified environment (ENV=dev|staging|prod|common)
+tf-init: ## Initialize Terraform for specified environment (ENV=dev|prod|common)
 	@echo "\033[1;34m→ Initializing Terraform for $(ENV) environment...\033[0m"
 	cd terraform/environments/$(ENV) && terraform init
 
-tf-plan: ## Plan Terraform changes (ENV=dev|staging|prod|common)
+tf-plan: ## Plan Terraform changes (ENV=dev|prod|common)
 	@echo "\033[1;34m→ Planning Terraform changes for $(ENV) environment...\033[0m"
 	cd terraform/environments/$(ENV) && terraform plan -out=tfplan
 
-tf-apply: ## Apply Terraform changes (ENV=dev|staging|prod|common)
+tf-apply: ## Apply Terraform changes (ENV=dev|prod|common)
 	@echo "\033[1;34m→ Applying Terraform changes for $(ENV) environment...\033[0m"
 	cd terraform/environments/$(ENV) && terraform apply tfplan
 
-tf-destroy: ## Destroy Terraform infrastructure (ENV=dev|staging|prod|common)
+tf-destroy: ## Destroy Terraform infrastructure (ENV=dev|prod|common)
 	@echo "\033[1;31m⚠️  WARNING: This will destroy all infrastructure in $(ENV) environment!\033[0m"
 	@echo "Press Ctrl+C to cancel, or wait 5 seconds to continue..."
 	@sleep 5
 	cd terraform/environments/$(ENV) && terraform destroy
 
-tf-output: ## Show Terraform outputs (ENV=dev|staging|prod|common)
+tf-output: ## Show Terraform outputs (ENV=dev|prod|common)
 	@cd terraform/environments/$(ENV) && terraform output
 
 tf-fmt: ## Format all Terraform files
@@ -91,7 +91,7 @@ scan-iac: ## Scan infrastructure code (requires checkov)
 # This enforces proper CI/CD practices and prevents manual deployments.
 #
 
-logs: ## Tail CloudWatch logs (ENV=dev|staging|prod)
+logs: ## Tail CloudWatch logs (ENV=dev|prod)
 	@echo "\033[1;34m→ Tailing logs from $(ENV) environment...\033[0m"
 	$(eval LOG_GROUP := $(shell cd terraform/environments/$(ENV) && terraform output -raw log_group_name))
 	aws logs tail $(LOG_GROUP) --follow --region $(AWS_REGION)
@@ -101,7 +101,7 @@ logs-recent: ## Show recent logs (last 10 minutes)
 	$(eval LOG_GROUP := $(shell cd terraform/environments/$(ENV) && terraform output -raw log_group_name))
 	aws logs tail $(LOG_GROUP) --since 10m --region $(AWS_REGION)
 
-status: ## Show ECS service status (ENV=dev|staging|prod)
+status: ## Show ECS service status (ENV=dev|prod)
 	@echo "\033[1;34m→ Checking service status in $(ENV) environment...\033[0m"
 	$(eval CLUSTER := $(shell cd terraform/environments/$(ENV) && terraform output -raw ecs_cluster_name))
 	$(eval SERVICE := $(shell cd terraform/environments/$(ENV) && terraform output -raw ecs_service_name))
@@ -112,10 +112,10 @@ status: ## Show ECS service status (ENV=dev|staging|prod)
 		--query 'services[0].{Status:status,Running:runningCount,Desired:desiredCount,Pending:pendingCount}' \
 		--output table
 
-url: ## Get application URL (ENV=dev|staging|prod)
+url: ## Get application URL (ENV=dev|prod)
 	@cd terraform/environments/$(ENV) && terraform output alb_url
 
-open: ## Open application in browser (ENV=dev|staging|prod)
+open: ## Open application in browser (ENV=dev|prod)
 	@$(eval URL := $(shell cd terraform/environments/$(ENV) && terraform output -raw alb_url))
 	@echo "\033[1;34m→ Opening $(URL) in browser...\033[0m"
 	@open $(URL)/api/hello || xdg-open $(URL)/api/hello
@@ -165,7 +165,7 @@ destroy-common: ## Destroy common infrastructure (ECR, OIDC, S3) - DESTRUCTIVE!
 	@echo "\033[1;31m    - OIDC provider and IAM role for GitHub Actions\033[0m"
 	@echo "\033[1;31m    - S3 bucket for Terraform state\033[0m"
 	@echo ""
-	@echo "\033[1;33m→ Make sure all environments (dev/staging/prod) are destroyed first!\033[0m"
+	@echo "\033[1;33m→ Make sure all environments (dev/prod) are destroyed first!\033[0m"
 	@echo "\033[1;33m→ Type 'destroy-common' to confirm, or press Ctrl+C to cancel:\033[0m"
 	@read confirmation; \
 	if [ "$$confirmation" != "destroy-common" ]; then \

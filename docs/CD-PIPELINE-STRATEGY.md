@@ -5,12 +5,12 @@
 ### ✅ Recommended Approach: Progressive Delivery Pipeline
 
 ```
-┌──────────┐     ┌─────────────┐     ┌──────────────┐     ┌────────────┐
-│  Build   │ ──> │  Deploy Dev │ ──> │ Deploy Stage │ ──> │ Deploy Prod│
-│ (1 image)│     │  (automatic)│     │  (automatic) │     │  (manual)  │
-└──────────┘     └─────────────┘     └──────────────┘     └────────────┘
-                       ↓                    ↓                    ↓
-                 Smoke Tests          Integration Tests    Full Tests
+┌──────────┐     ┌─────────────┐     ┌────────────┐
+│  Build   │ ──> │  Deploy Dev │ ──> │ Deploy Prod│
+│ (1 image)│     │  (automatic)│     │  (manual)  │
+└──────────┘     └─────────────┘     └────────────┘
+                       ↓                    ↓
+                 Smoke Tests           Full Tests
 ```
 
 ### Key Design Decisions
@@ -45,10 +45,6 @@ Production:
   ✅ Branch protection: main only
   ✅ Secrets: PROD_AWS_ROLE_ARN
 
-Staging:
-  ✅ Auto-deploy from main
-  ⬜ No approvals needed
-
 Dev:
   ✅ Auto-deploy from main
   ✅ Cancel in-progress runs
@@ -67,12 +63,6 @@ deploy-dev:
     group: deploy-dev
     cancel-in-progress: true  # ✅ Fast feedback, latest code
 
-# STAGING - Queue deployments
-deploy-staging:
-  concurrency:
-    group: deploy-staging
-    cancel-in-progress: false  # ✅ Test every build
-
 # PROD - Queue and protect
 deploy-prod:
   concurrency:
@@ -85,7 +75,6 @@ deploy-prod:
 | Environment | Strategy | Reasoning |
 |-------------|----------|-----------|
 | **Dev** | Cancel old | Developers want latest code ASAP. Old deploys are wasted. |
-| **Staging** | Queue | Need to test every build before prod. Can't skip. |
 | **Prod** | Queue + Manual | Every deployment is deliberate. Can't cancel. |
 
 ### Alternative Approaches Considered
@@ -96,19 +85,17 @@ jobs:
   deploy:
     strategy:
       matrix:
-        environment: [dev, staging, prod]
+        environment: [dev, prod]
 ```
 
 **Problems:**
 - All environments deploy simultaneously
-- Can't test staging before prod
 - No promotion workflow
 - Risk of deploying broken code to prod
 
 #### ❌ Option B: Separate Workflows per Environment
 ```
 .github/workflows/deploy-dev.yml
-.github/workflows/deploy-staging.yml
 .github/workflows/deploy-prod.yml
 ```
 
@@ -122,7 +109,7 @@ jobs:
 ```yaml
 on:
   workflow_run:
-    workflows: ["Deploy to Staging"]
+    workflows: ["Deploy to Dev"]
     types: [completed]
 ```
 
@@ -150,15 +137,8 @@ jobs:
       group: deploy-dev
       cancel-in-progress: true
 
-  deploy-staging:
-    needs: [build, deploy-dev]  # Chains after dev
-    environment: staging
-    concurrency:
-      group: deploy-staging
-      cancel-in-progress: false
-
   deploy-prod:
-    needs: [build, deploy-staging]  # Chains after staging
+    needs: [build, deploy-dev]  # Chains after dev
     environment: production  # Manual approval required
     concurrency:
       group: deploy-prod
@@ -166,11 +146,11 @@ jobs:
 ```
 
 **Benefits:**
-1. ✅ **Progressive Delivery**: Must pass dev → staging → prod
+1. ✅ **Progressive Delivery**: Must pass dev → prod
 2. ✅ **Single Workflow**: All logic in one place
 3. ✅ **Concurrency Control**: Prevent race conditions
 4. ✅ **Fast Feedback**: Dev deployments don't wait
-5. ✅ **Safety**: Prod requires approval + staging success
+5. ✅ **Safety**: Prod requires approval + dev success
 6. ✅ **Visibility**: One view shows entire pipeline
 7. ✅ **Artifact Sharing**: Image tag passes between jobs
 
@@ -180,20 +160,19 @@ jobs:
 
 **Without Concurrency Control:**
 ```
-Commit A: dev → staging → prod (deploying)
-Commit B: dev → staging → prod (deploying)  ❌ Race condition!
-Commit C: dev → staging → prod (deploying)  ❌ Out of order!
+Commit A: dev → prod (deploying)
+Commit B: dev → prod (deploying)  ❌ Race condition!
+Commit C: dev → prod (deploying)  ❌ Out of order!
 ```
 
 **With Our Strategy:**
 ```
-Commit A: dev → staging → prod ✅
-Commit B: dev (cancels A's dev) → staging (queued) → prod (queued) ✅
-Commit C: dev (cancels B's dev) → staging (queued) → prod (queued) ✅
+Commit A: dev → prod ✅
+Commit B: dev (cancels A's dev) → prod (queued) ✅
+Commit C: dev (cancels B's dev) → prod (queued) ✅
 
 Result:
 - Dev: Only C deploys (latest)
-- Staging: A, B, C deploy in order (all tested)
 - Prod: Manual approval for each (safe)
 ```
 
@@ -269,12 +248,11 @@ workflow_dispatch:
 **Workflow Minutes:**
 - Build: ~5 minutes
 - Deploy per environment: ~3 minutes
-- Total per push to main: ~14 minutes
+- Total per push to main: ~11 minutes
 
 **Optimization:**
 - Cache Docker layers: Save 2-3 minutes
 - Use GitHub's larger runners for build: Faster but costs more
-- Skip staging for feature branches: Save minutes
 
 ### Security Best Practices
 
@@ -288,12 +266,10 @@ workflow_dispatch:
 
 2. **Environment-specific secrets:**
 - `DEV_AWS_ROLE_ARN`
-- `STAGING_AWS_ROLE_ARN`
 - `PROD_AWS_ROLE_ARN`
 
 3. **Approval gates:**
 - Production requires team approval
-- Staging auto-deploys after dev success
 - Dev auto-deploys on every commit
 
 ### Comparison Table
@@ -313,7 +289,6 @@ This approach:
 - ✅ Prevents race conditions
 - ✅ Enables progressive delivery
 - ✅ Provides fast feedback (dev)
-- ✅ Ensures quality (staging)
 - ✅ Protects production (manual approval)
 - ✅ Scales to multiple teams
 - ✅ Easy to understand and maintain

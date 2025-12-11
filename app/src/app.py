@@ -20,7 +20,7 @@ def create_app(config_name=None):
     """Application factory pattern for Flask.
 
     Args:
-        config_name: Configuration environment name (dev, staging, prod).
+        config_name: Configuration environment name (dev, prod).
                     If None, uses ENVIRONMENT env var.
 
     Returns:
@@ -42,7 +42,7 @@ def create_app(config_name=None):
         # Allow all origins in development
         CORS(app)
     else:
-        # Restrict origins in staging/production
+        # Restrict origins in production
         cors_origins = os.environ.get("CORS_ORIGINS", "")
         allowed_origins = [o.strip() for o in cors_origins.split(",") if o.strip()]
         if allowed_origins:
