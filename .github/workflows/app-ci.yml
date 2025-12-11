@@ -133,21 +133,23 @@ jobs:
           curl -f http://localhost:8080/health || exit 1
           curl -f http://localhost:8080/api/hello || exit 1
 
-          # Cleanup
-          docker stop test-container
-          docker rm test-container
-
       - name: Run Trivy container scan
         uses: aquasecurity/trivy-action@master
         continue-on-error: true
         with:
-          image-ref: demo-app:${{ github.sha }}
+          image-ref: demo-app:test
           format: 'sarif'
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH'
 
+      - name: Cleanup Docker resources
+        if: always()
+        run: |
+          docker stop test-container || true
+          docker rm test-container || true
+
       - name: Upload Trivy results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         continue-on-error: true
         with:
