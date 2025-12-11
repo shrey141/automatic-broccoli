@@ -140,7 +140,7 @@ def setup_logging(app):
 
         # Log actual server errors
         app.logger.error(
-            f"Unhandled exception: {str(error)}",
+            f"Unhandled exception: {error!s}",
             exc_info=True,
             extra={
                 "extra_fields": {
@@ -156,7 +156,7 @@ def setup_logging(app):
         }, 500
 
     app.logger.info(
-        f"Logging configured",
+        "Logging configured",
         extra={
             "extra_fields": {
                 "log_level": log_level,

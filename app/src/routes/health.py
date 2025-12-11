@@ -15,7 +15,7 @@ bp = Blueprint("health", __name__)
 
 @bp.route("/health", methods=["GET"])
 def health():
-    """Basic health check endpoint.
+    """Return basic health check information.
 
     Returns:
         JSON response with health status and metadata.
@@ -36,7 +36,7 @@ def health():
 
 @bp.route("/health/ready", methods=["GET"])
 def ready():
-    """Readiness probe endpoint.
+    """Check if the application is ready to serve traffic.
 
     Checks if the application is ready to serve traffic.
     In a real application, this would check:
@@ -73,7 +73,7 @@ def ready():
 
 @bp.route("/health/live", methods=["GET"])
 def live():
-    """Liveness probe endpoint.
+    """Indicate whether the application is alive.
 
     Indicates if the application is alive and running.
     This should only fail if the application is completely unresponsive.
