@@ -126,6 +126,15 @@ data "aws_iam_policy_document" "aws_resources_policy" {
   }
 
   statement {
+    sid    = "ApplicationAutoScalingAccess"
+    effect = "Allow"
+    actions = [
+      "application-autoscaling:*"
+    ]
+    resources = ["*"]
+  }
+
+  statement {
     sid    = "STSAccess"
     effect = "Allow"
     actions = [
