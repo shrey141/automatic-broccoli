@@ -1,4 +1,4 @@
-.PHONY: help test build run clean deploy tf-init tf-plan tf-apply tf-destroy scan-container scan-deps lint format
+.PHONY: help test build run clean tf-init tf-plan tf-apply tf-destroy scan-container scan-deps lint format version
 
 # Default environment
 ENV ?= dev
@@ -84,46 +84,12 @@ scan-iac: ## Scan infrastructure code (requires checkov)
 	@echo "\033[1;34m→ Scanning infrastructure code...\033[0m"
 	checkov -d terraform/ --quiet || true
 
-##@ Deployment
-
-deploy-image: ## Build and push Docker image to ECR
-	@echo "\033[1;34m→ Building and pushing image to ECR...\033[0m"
-	$(eval ECR_REPO := $(shell cd terraform/environments/$(ENV) && terraform output -raw ecr_repository_url))
-	$(eval AWS_ACCOUNT_ID := $(shell aws sts get-caller-identity --query Account --output text))
-	@echo "ECR Repository: $(ECR_REPO)"
-	aws ecr get-login-password --region $(AWS_REGION) | \
-		docker login --username AWS --password-stdin $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
-	cd app && docker build -t demo-app:latest .
-	docker tag demo-app:latest $(ECR_REPO):latest
-	docker tag demo-app:latest $(ECR_REPO):$(shell cat VERSION)
-	docker push $(ECR_REPO):latest
-	docker push $(ECR_REPO):$(shell cat VERSION)
-
-deploy-service: ## Deploy new version to ECS (ENV=dev|staging|prod)
-	@echo "\033[1;34m→ Deploying to ECS $(ENV) environment...\033[0m"
-	$(eval CLUSTER := $(shell cd terraform/environments/$(ENV) && terraform output -raw ecs_cluster_name))
-	$(eval SERVICE := $(shell cd terraform/environments/$(ENV) && terraform output -raw ecs_service_name))
-	aws ecs update-service \
-		--cluster $(CLUSTER) \
-		--service $(SERVICE) \
-		--force-new-deployment \
-		--region $(AWS_REGION)
-	@echo "\033[1;32m✓ Deployment initiated. Waiting for service to stabilize...\033[0m"
-	aws ecs wait services-stable \
-		--cluster $(CLUSTER) \
-		--services $(SERVICE) \
-		--region $(AWS_REGION)
-	@echo "\033[1;32m✓ Service deployed successfully!\033[0m"
-
-deploy: deploy-image deploy-service ## Full deployment: build, push, and deploy
-
-deploy-common: ## Deploy common configuration to AWS
-	@echo "\033[1;34m→ Deploying common configuration...\033[0m"
-	$(MAKE) tf-init ENV=common
-	$(MAKE) tf-plan ENV=common
-	$(MAKE) tf-apply ENV=common
-
 ##@ Monitoring
+#
+# NOTE: Application deployments must be done via GitHub Actions (app-cd.yml).
+# Infrastructure changes must be done via GitHub Actions (terraform-deploy.yml).
+# This enforces proper CI/CD practices and prevents manual deployments.
+#
 
 logs: ## Tail CloudWatch logs (ENV=dev|staging|prod)
 	@echo "\033[1;34m→ Tailing logs from $(ENV) environment...\033[0m"
@@ -170,21 +136,25 @@ setup: ## Setup development environment
 	cd app && . venv/bin/activate && pip install -r requirements-dev.txt
 	@echo "\033[1;32m✓ Setup complete! Activate with: cd app && source venv/bin/activate\033[0m"
 
-version: ## Show current version
-	@cat VERSION
+version: ## Show current application version from pyproject.toml
+	@grep '^version = ' app/pyproject.toml | cut -d'"' -f2
 
-bootstrap-backend: ## Create Terraform backend resources (S3 + DynamoDB)
-	@echo "\033[1;34m→ Creating Terraform backend resources...\033[0m"
-	$(eval AWS_ACCOUNT_ID := $(shell aws sts get-caller-identity --query Account --output text))
-	aws s3 mb s3://demo-app-terraform-state-$(AWS_ACCOUNT_ID) --region $(AWS_REGION) 2>/dev/null || true
-	aws s3api put-bucket-versioning \
-		--bucket demo-app-terraform-state-$(AWS_ACCOUNT_ID) \
-		--versioning-configuration Status=Enabled
-	aws dynamodb create-table \
-		--table-name demo-app-terraform-locks \
-		--attribute-definitions AttributeName=LockID,AttributeType=S \
-		--key-schema AttributeName=LockID,KeyType=HASH \
-		--billing-mode PAY_PER_REQUEST \
-		--region $(AWS_REGION) 2>/dev/null || true
-	@echo "\033[1;32m✓ Backend resources created\033[0m"
-	@echo "\033[1;33m→ Update backend configuration in terraform/environments/*/main.tf\033[0m"
+bootstrap-common: ## Bootstrap common infrastructure (ECR, OIDC, S3) - ONE TIME ONLY
+	@echo "\033[1;34m→ Bootstrapping common infrastructure (ECR, OIDC, State bucket)...\033[0m"
+	@echo "\033[1;33m⚠️  This should only be run ONCE to set up shared resources\033[0m"
+	$(MAKE) tf-init ENV=common
+	$(MAKE) tf-plan ENV=common
+	@echo "\033[1;33m→ Review the plan above. Press ENTER to apply or Ctrl+C to cancel\033[0m"
+	@read dummy
+	$(MAKE) tf-apply ENV=common
+	@echo "\033[1;32m✓ Common resources deployed!\033[0m"
+	@echo ""
+	@echo "\033[1;33mNext steps:\033[0m"
+	@echo "  1. Verify OIDC role ARN matches GitHub secret AWS_ROLE_ARN"
+	@echo "  2. Use GitHub Actions to deploy infrastructure:"
+	@echo "     - Push terraform changes to trigger terraform-deploy.yml"
+	@echo "     - Or manually trigger via GitHub UI"
+	@echo "  3. Use GitHub Actions to deploy application:"
+	@echo "     - Push app changes to trigger app-cd.yml"
+	@echo "     - Or manually trigger via GitHub UI"
+

@@ -16,6 +16,9 @@ RUN pip install --user --no-cache-dir --no-warn-script-location -r requirements.
 # Stage 2: Runtime - Minimal production image
 FROM python:3.11-slim
 
+# Build argument for version (provided by CI/CD)
+ARG APP_VERSION=unknown
+
 # Security: Create non-root user
 RUN groupadd -r appuser && useradd -r -g appuser -u 1000 appuser
 
@@ -24,15 +27,17 @@ WORKDIR /app
 # Copy Python dependencies from builder stage
 COPY --from=builder /root/.local /home/appuser/.local
 
-# Copy application source code
+# Copy application source code and pyproject.toml for version metadata
 COPY --chown=appuser:appuser src/ ./src/
+COPY --chown=appuser:appuser pyproject.toml ./
 
 # Set environment variables
 ENV PATH=/home/appuser/.local/bin:$PATH \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     FLASK_APP=src.app:create_app \
-    PORT=8080
+    PORT=8080 \
+    APP_VERSION=${APP_VERSION}
 
 # Switch to non-root user
 USER appuser

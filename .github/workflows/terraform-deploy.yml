@@ -1,0 +1,228 @@
+name: Deploy Infrastructure
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'terraform/**'
+      - '.github/workflows/terraform-deploy.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy infrastructure to'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: write
+
+env:
+  TF_VERSION: '1.5.0'
+  AWS_REGION: us-east-1
+
+jobs:
+  # Deploy infrastructure to Dev (automatic)
+  deploy-dev:
+    name: Deploy Infrastructure - Dev
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'dev')
+    environment:
+      name: dev
+    concurrency:
+      group: terraform-deploy-dev
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: |
+          cd terraform/environments/dev
+          terraform init
+
+      - name: Terraform Plan
+        id: plan
+        run: |
+          cd terraform/environments/dev
+          terraform plan -no-color -out=tfplan 2>&1 | tee plan-output.txt
+
+      - name: Terraform Apply
+        id: apply
+        run: |
+          cd terraform/environments/dev
+          terraform apply -auto-approve tfplan
+
+      - name: Get outputs
+        id: outputs
+        run: |
+          cd terraform/environments/dev
+          echo "alb_url=$(terraform output -raw alb_url)" >> $GITHUB_OUTPUT
+          echo "ecs_cluster=$(terraform output -raw ecs_cluster_name)" >> $GITHUB_OUTPUT
+          echo "ecs_service=$(terraform output -raw ecs_service_name)" >> $GITHUB_OUTPUT
+
+      - name: Summary
+        run: |
+          echo "## Infrastructure Deployment - Dev" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Infrastructure deployed successfully" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Resources:**" >> $GITHUB_STEP_SUMMARY
+          echo "- ALB URL: ${{ steps.outputs.outputs.alb_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "- ECS Cluster: ${{ steps.outputs.outputs.ecs_cluster }}" >> $GITHUB_STEP_SUMMARY
+          echo "- ECS Service: ${{ steps.outputs.outputs.ecs_service }}" >> $GITHUB_STEP_SUMMARY
+
+  # Deploy infrastructure to Staging (automatic after dev)
+  deploy-staging:
+    name: Deploy Infrastructure - Staging
+    needs: deploy-dev
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')
+    environment:
+      name: staging
+    concurrency:
+      group: terraform-deploy-staging
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: |
+          cd terraform/environments/staging
+          terraform init
+
+      - name: Terraform Plan
+        id: plan
+        run: |
+          cd terraform/environments/staging
+          terraform plan -no-color -out=tfplan 2>&1 | tee plan-output.txt
+
+      - name: Terraform Apply
+        id: apply
+        run: |
+          cd terraform/environments/staging
+          terraform apply -auto-approve tfplan
+
+      - name: Get outputs
+        id: outputs
+        run: |
+          cd terraform/environments/staging
+          echo "alb_url=$(terraform output -raw alb_url)" >> $GITHUB_OUTPUT
+          echo "ecs_cluster=$(terraform output -raw ecs_cluster_name)" >> $GITHUB_OUTPUT
+          echo "ecs_service=$(terraform output -raw ecs_service_name)" >> $GITHUB_OUTPUT
+
+      - name: Summary
+        run: |
+          echo "## Infrastructure Deployment - Staging" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Infrastructure deployed successfully" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Resources:**" >> $GITHUB_STEP_SUMMARY
+          echo "- ALB URL: ${{ steps.outputs.outputs.alb_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "- ECS Cluster: ${{ steps.outputs.outputs.ecs_cluster }}" >> $GITHUB_STEP_SUMMARY
+          echo "- ECS Service: ${{ steps.outputs.outputs.ecs_service }}" >> $GITHUB_STEP_SUMMARY
+
+  # Deploy infrastructure to Production (manual approval required)
+  deploy-prod:
+    name: Deploy Infrastructure - Production
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prod')
+    environment:
+      name: production
+    concurrency:
+      group: terraform-deploy-prod
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: |
+          cd terraform/environments/prod
+          terraform init
+
+      - name: Terraform Plan
+        id: plan
+        run: |
+          cd terraform/environments/prod
+          terraform plan -no-color -out=tfplan 2>&1 | tee plan-output.txt
+
+      - name: Terraform Apply
+        id: apply
+        run: |
+          cd terraform/environments/prod
+          terraform apply -auto-approve tfplan
+
+      - name: Get outputs
+        id: outputs
+        run: |
+          cd terraform/environments/prod
+          echo "alb_url=$(terraform output -raw alb_url)" >> $GITHUB_OUTPUT
+          echo "ecs_cluster=$(terraform output -raw ecs_cluster_name)" >> $GITHUB_OUTPUT
+          echo "ecs_service=$(terraform output -raw ecs_service_name)" >> $GITHUB_OUTPUT
+
+      - name: Summary
+        run: |
+          echo "## Infrastructure Deployment - Production" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Infrastructure deployed successfully" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Resources:**" >> $GITHUB_STEP_SUMMARY
+          echo "- ALB URL: ${{ steps.outputs.outputs.alb_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "- ECS Cluster: ${{ steps.outputs.outputs.ecs_cluster }}" >> $GITHUB_STEP_SUMMARY
+          echo "- ECS Service: ${{ steps.outputs.outputs.ecs_service }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Notify team
+        if: always()
+        run: |
+          STATUS="${{ job.status }}"
+          if [ "$STATUS" == "success" ]; then
+            echo "✅ Production infrastructure deployment SUCCESSFUL"
+            # Add Slack/email notification here
+          else
+            echo "❌ Production infrastructure deployment FAILED"
+            # Add alert here
+          fi

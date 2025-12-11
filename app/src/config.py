@@ -15,7 +15,17 @@ class Config:
 
     # Application
     APP_NAME = "demo-app"
-    APP_VERSION = os.environ.get("APP_VERSION", "1.0.0")
+    # Version injected by CI/CD or read from package metadata
+    APP_VERSION = os.environ.get("APP_VERSION", None)
+
+    if APP_VERSION is None:
+        try:
+            from importlib.metadata import version
+
+            APP_VERSION = version("demo-app")
+        except Exception:
+            APP_VERSION = "unknown"
+
     ENVIRONMENT = os.environ.get("ENVIRONMENT", "dev")
 
     # AWS
