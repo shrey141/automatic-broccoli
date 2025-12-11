@@ -18,6 +18,10 @@ on:
         required: true
         default: ''
 
+permissions:
+  contents: read
+  id-token: write
+
 env:
   AWS_REGION: us-east-1
 
@@ -32,7 +36,7 @@ jobs:
     if: ${{ github.event.inputs.confirm == 'DESTROY' && (github.event.inputs.environment == 'all' || github.event.inputs.environment == matrix.env) }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -60,7 +64,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
