@@ -49,13 +49,6 @@ class DevelopmentConfig(Config):
     FLASK_ENV = "development"
 
 
-class StagingConfig(Config):
-    """Staging environment configuration."""
-
-    DEBUG = False
-    LOG_LEVEL = "INFO"
-
-
 class ProductionConfig(Config):
     """Production environment configuration."""
 
@@ -73,7 +66,6 @@ class ProductionConfig(Config):
 config_by_name = {
     "dev": DevelopmentConfig,
     "development": DevelopmentConfig,
-    "staging": StagingConfig,
     "prod": ProductionConfig,
     "production": ProductionConfig,
 }
@@ -83,7 +75,7 @@ def get_config(env_name=None):
     """Get configuration object based on environment name.
 
     Args:
-        env_name: Environment name (dev, staging, prod). If None, uses ENVIRONMENT env var.
+        env_name: Environment name (dev, prod). If None, uses ENVIRONMENT env var.
 
     Returns:
         Configuration object instance.

@@ -78,8 +78,6 @@ resource "aws_eip" "nat" {
       Name = "${var.environment}-nat-eip-${count.index + 1}"
     }
   )
-
-  depends_on = [aws_internet_gateway.main]
 }
 
 # NAT Gateways
@@ -95,8 +93,6 @@ resource "aws_nat_gateway" "main" {
       Name = "${var.environment}-nat-${count.index + 1}"
     }
   )
-
-  depends_on = [aws_internet_gateway.main]
 }
 
 # Public Route Table

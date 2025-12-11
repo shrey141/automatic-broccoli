@@ -9,7 +9,6 @@ on:
         type: choice
         options:
           - dev
-          - staging
           - prod
           - common
           - all
@@ -32,7 +31,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        env: [dev, staging, prod]
+        env: [dev, prod]
     if: ${{ github.event.inputs.confirm == 'DESTROY' }}
     steps:
       - name: Check if environment should be destroyed

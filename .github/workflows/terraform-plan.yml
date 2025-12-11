@@ -44,7 +44,7 @@ jobs:
       - name: Terraform Init (all environments)
         run: |
           set -e
-          for env in dev staging prod; do
+          for env in dev prod; do
             echo "Initializing $env environment..."
             cd terraform/environments/$env
             terraform init -backend=false
@@ -54,7 +54,7 @@ jobs:
 
       - name: Terraform Validate (all environments)
         run: |
-          for env in dev staging prod; do
+          for env in dev prod; do
             echo "Validating $env environment..."
             cd terraform/environments/$env
             terraform validate
@@ -156,7 +156,7 @@ jobs:
 
     strategy:
       matrix:
-        environment: [dev, staging, prod]
+        environment: [dev, prod]
 
     steps:
       - name: Checkout code
