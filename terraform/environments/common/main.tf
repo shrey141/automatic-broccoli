@@ -61,3 +61,14 @@ module "tf_state" {
   tags = local.common_tags
 }
 
+# ECR Module (shared across all environments)
+module "ecr" {
+  source = "../../modules/ecr"
+
+  repository_name = "demo-app"
+  retention_count = 30 # Keep images for all environments
+  scan_on_push    = true
+
+  tags = local.common_tags
+}
+

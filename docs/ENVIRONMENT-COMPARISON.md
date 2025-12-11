@@ -20,7 +20,7 @@ All three environments use the **same Terraform modules** but with different con
 | **Auto-scaling Min** | 1 | 2 | 3 |
 | **Auto-scaling Max** | 4 | 6 | 10 |
 | **Log Retention** | 7 days | 14 days | 30 days |
-| **ECR Image Retention** | 5 images | 10 images | 30 images |
+| **ECR Repository** | Shared | Shared | Shared (30 images) |
 | **Deletion Protection** | Disabled | Disabled | Optional (recommended) |
 | **CPU Alarm Threshold** | 80% | 75% | 70% |
 | **Memory Alarm Threshold** | 85% | 80% | 75% |
@@ -35,10 +35,10 @@ All three environments use the **same Terraform modules** but with different con
 ECS Fargate (Spot): 2 tasks × 256 CPU × 512 MB × 730 hrs × $0.01219870 = ~$11/month
 ALB:                                                                      ~$18/month
 NAT Gateway:        2 AZs × 730 hrs × $0.045 + data                      ~$66/month
-ECR:                <5 images                                            ~$0.10/month
 CloudWatch:         Logs (7 days) + Metrics + Alarms                    ~$5/month
 ────────────────────────────────────────────────────────────────────────────────
 TOTAL:                                                                   ~$100/month
+Note: ECR cost (~$0.60/month) shared across all environments
 ```
 
 ### Staging Environment
@@ -46,10 +46,10 @@ TOTAL:                                                                   ~$100/m
 ECS Fargate:        2 tasks × 512 CPU × 1024 MB × 730 hrs × $0.04048640 = ~$59/month
 ALB:                                                                      ~$18/month
 NAT Gateway:        2 AZs                                                ~$66/month
-ECR:                <10 images                                           ~$0.20/month
 CloudWatch:         Logs (14 days) + Metrics + Alarms                   ~$8/month
 ────────────────────────────────────────────────────────────────────────────────
 TOTAL:                                                                   ~$151/month
+Note: ECR cost (~$0.60/month) shared across all environments
 ```
 
 ### Production Environment
@@ -57,14 +57,20 @@ TOTAL:                                                                   ~$151/m
 ECS Fargate:        3 tasks × 1024 CPU × 2048 MB × 730 hrs × $0.08097280 = ~$177/month
 ALB:                                                                       ~$18/month
 NAT Gateway:        3 AZs × 730 hrs × $0.045 + data                       ~$99/month
-ECR:                <30 images                                            ~$0.60/month
 CloudWatch:         Logs (30 days) + Metrics + Alarms + Dashboards       ~$15/month
 VPC Flow Logs:      Storage + queries                                    ~$10/month
 ────────────────────────────────────────────────────────────────────────────────
-TOTAL:                                                                    ~$320/month
+TOTAL:                                                                    ~$319/month
 ```
 
-**Annual Total: ~$571/month × 12 = ~$6,852/year**
+**Shared Resources:**
+```
+ECR:                <30 images (shared across all environments)            ~$0.60/month
+S3 State Bucket:    Terraform state files                                 ~$0.10/month
+────────────────────────────────────────────────────────────────────────────────
+```
+
+**Annual Total: (~$570/month × 12) + $8.40 = ~$6,848/year**
 
 ## Detailed Differences
 
@@ -214,16 +220,18 @@ environment:
 - **Rollback:** Revert git commit
 
 #### Staging
-- **Backup Strategy:** Terraform state + ECR images
+- **Backup Strategy:** Terraform state + shared ECR images
 - **RTO:** 15 minutes (redeploy)
 - **RPO:** Minimal data loss
 - **Rollback:** Previous image tag
 
 #### Production
-- **Backup Strategy:** Terraform state + ECR images + logs
+- **Backup Strategy:** Terraform state + shared ECR images + logs
 - **RTO:** 5 minutes (blue-green deploy)
 - **RPO:** No data loss acceptable
 - **Rollback:** Instant (previous task definition)
+
+**Note:** ECR repository is shared across all environments and managed in the `common` environment. All environments reference the same container images with different tags.
 
 ## Promotion Workflow
 

@@ -11,10 +11,10 @@ terraform {
   }
 
   backend "s3" {
-    bucket         = "demo-app-terraform-state-files-per-env"
-    key            = "dev/terraform.tfstate"
-    region         = "us-east-1"
-    encrypt        = true
+    bucket  = "demo-app-terraform-state-files-per-env"
+    key     = "dev/terraform.tfstate"
+    region  = "us-east-1"
+    encrypt = true
   }
 }
 
@@ -41,6 +41,11 @@ data "aws_availability_zones" "available" {
   state = "available"
 }
 
+# Reference the shared ECR repository created in common environment
+data "aws_ecr_repository" "demo_app" {
+  name = "demo-app"
+}
+
 # Networking Module
 module "networking" {
   source = "../../modules/networking"
@@ -50,17 +55,6 @@ module "networking" {
   availability_zones   = slice(data.aws_availability_zones.available.names, 0, 2)
   enable_nat_gateway   = var.enable_nat_gateway
   enable_vpc_flow_logs = false
-
-  tags = local.common_tags
-}
-
-# ECR Module
-module "ecr" {
-  source = "../../modules/ecr"
-
-  repository_name = "demo-app"
-  retention_count = 5
-  scan_on_push    = true
 
   tags = local.common_tags
 }
@@ -102,7 +96,7 @@ module "ecs_service" {
   private_subnets          = module.networking.private_subnet_ids
   target_group_arn         = module.alb.target_group_arn
   alb_security_group_id    = module.alb.alb_security_group_id
-  container_image          = "${module.ecr.repository_url}:latest"
+  container_image          = "${data.aws_ecr_repository.demo_app.repository_url}:latest"
   container_port           = 8080
   task_cpu                 = var.ecs_task_cpu
   task_memory              = var.ecs_task_memory
