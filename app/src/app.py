@@ -36,16 +36,22 @@ def create_app(config_name=None):
     setup_logging(app)  # Logging first so other middleware can log
     setup_metrics(app)  # Metrics to track all requests
 
-    # Enable CORS for development/testing
-    CORS(app)
     # Enable CORS with environment-specific restrictions
-    if app.config.get("ENVIRONMENT") in ["dev", "development"]:
-        CORS(app)  # Allow all origins in development
+    env = app.config.get("ENVIRONMENT")
+    if env in ["dev", "development"]:
+        # Allow all origins in development
+        CORS(app)
     else:
         # Restrict origins in staging/production
-        allowed_origins = os.environ.get("CORS_ORIGINS", "").split(",")
+        cors_origins = os.environ.get("CORS_ORIGINS", "")
+        allowed_origins = [o.strip() for o in cors_origins.split(",") if o.strip()]
         if allowed_origins:
             CORS(app, origins=allowed_origins)
+        else:
+            logger.warning(
+                "CORS_ORIGINS not set; CORS disabled for environment %s",
+                env,
+            )
 
     # Register blueprints
     app.register_blueprint(health.bp)
