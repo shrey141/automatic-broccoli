@@ -3,15 +3,14 @@
 Integrates Prometheus metrics export and CloudWatch custom metrics.
 """
 
-import os
 import logging
 from prometheus_flask_exporter import PrometheusMetrics
-from flask import request, g
+from flask import request
 
 logger = logging.getLogger(__name__)
 
 
-def setup_metrics(app):
+def setup_metrics(app):  # noqa: C901
     """Configure Prometheus metrics and CloudWatch integration.
 
     Args:
@@ -96,12 +95,12 @@ def setup_metrics(app):
                 except ClientError as e:
                     # Log error but don't fail the request
                     logger.warning(
-                        f"Failed to send metrics to CloudWatch: {e}",
+                        "Failed to send metrics to CloudWatch: %s", e,
                         extra={"extra_fields": {"error": str(e)}},
                     )
                 except Exception as e:
                     logger.error(
-                        f"Unexpected error sending CloudWatch metrics: {e}",
+                        "Unexpected error sending CloudWatch metrics: %s", e,
                         extra={"extra_fields": {"error": str(e)}},
                     )
 
@@ -116,7 +115,7 @@ def setup_metrics(app):
             )
         except Exception as e:
             logger.error(
-                f"Failed to initialize CloudWatch metrics: {e}",
+                "Failed to initialize CloudWatch metrics: %s", e,
                 extra={"extra_fields": {"error": str(e)}},
             )
 

@@ -62,7 +62,7 @@ def create_app(config_name=None):
 
     # Log application startup
     logger.info(
-        f"Application created",
+        "Application created",
         extra={
             "extra_fields": {
                 "app_name": app.config.get("APP_NAME"),
@@ -79,8 +79,11 @@ def create_app(config_name=None):
 # Create application instance for running directly
 if __name__ == "__main__":
     app = create_app()
+    # Bind to 0.0.0.0 for Docker container - this is required for the app
+    # to be accessible from outside the container. The security boundary
+    # is at the ALB/ingress level, not at the container network interface.
     app.run(
-        host="0.0.0.0",
+        host="0.0.0.0",  # nosec B104
         port=app.config.get("PORT", 8080),
         debug=app.config.get("DEBUG", False),
     )

@@ -54,6 +54,7 @@ class ProductionConfig(Config):
 
     # Override to ensure production security
     def __init__(self):
+        """Initialize production config and validate required environment variables."""
         if not os.environ.get("SECRET_KEY"):
             raise ValueError("SECRET_KEY environment variable must be set in production")
 

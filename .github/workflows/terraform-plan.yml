@@ -69,7 +69,8 @@ jobs:
       - name: Install Checkov
         run: |
           pip install --upgrade pip setuptools wheel
-          pip install "pycares>=4.3.0"
+          # Fix pycares/aiodns compatibility issue
+          pip install "pycares==4.4.0" "aiodns==3.1.1"
           pip install checkov
 
       - name: Run Checkov scan
