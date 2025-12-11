@@ -272,39 +272,3 @@ make tf-plan ENV=prod
 make tf-apply ENV=prod
 make deploy ENV=prod  # Will fail without manual approval in GitHub Actions
 ```
-
-## Interview Talking Points
-
-1. **"Show me how you handle multiple environments"**
-   - Point to this document
-   - Explain module reusability
-   - Show terraform.tfvars differences
-   - Discuss cost vs. reliability tradeoffs
-
-2. **"How do you ensure environment parity?"**
-   - Same Docker image promoted through all environments
-   - Same Terraform modules with different variables
-   - Configuration as code (no manual changes)
-
-3. **"How do you optimize costs?"**
-   - Fargate Spot in dev saves 70%
-   - Right-sizing based on actual usage
-   - Shorter log retention in non-prod
-   - Auto-scaling prevents over-provisioning
-
-4. **"What's your deployment strategy?"**
-   - Progressive delivery (dev → prod)
-   - GitHub Environments with approval gates
-   - Same image tag promoted through environments
-   - Rollback capability at each stage
-
-## Summary
-
-This multi-environment setup demonstrates:
-- ✅ **DRY Principles:** Same modules, different values
-- ✅ **Cost Optimization:** Appropriate sizing per environment
-- ✅ **Risk Management:** Progressive delivery with gates
-- ✅ **Platform Engineering:** Reusable, scalable patterns
-- ✅ **Production Thinking:** Proper observability and alerting
-
-Both environments are ready to deploy using the same Terraform modules with environment-specific variable files.

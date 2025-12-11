@@ -11,12 +11,13 @@
 
 This project demonstrates enterprise-scale DevOps and platform engineering practices through a complete, deployable application stack:
 
-- **Application**: Python Flask API with health checks, metrics, and structured logging
-- **Infrastructure**: AWS ECS Fargate with modular Terraform (VPC, ALB, ECS, ECR)
-- **CI/CD**: GitHub Actions with reusable workflows and security scanning
-- **Observability**: CloudWatch dashboards, metrics, logs, and automated alerting
-- **Security**: Multi-layer scanning (container, dependencies, IaC), policy as code
-- **Scalability**: Auto-scaling, multi-environment support, reusable components
+- **Application**: Python Flask API with health checks, metrics, and structured logging.
+- **Infrastructure**: AWS ECS Fargate with modular Terraform (VPC, ALB, ECS, ECR).
+- **CI/CD**: GitHub Actions for automated testing, security scanning, and deployment.
+- **Environments**: Isolated `dev` and `prod` environments, plus a `common` environment for shared resources.
+- **Observability**: CloudWatch dashboards, metrics, logs, and automated alerting.
+- **Security**: OIDC for keyless deployments, multi-layer scanning (container, dependencies, IaC), and policy as code.
+- **Scalability**: Auto-scaling, multi-environment support, and reusable components.
 
 ## 🏗️ Architecture
 
@@ -33,7 +34,7 @@ This project demonstrates enterprise-scale DevOps and platform engineering pract
 │  │              (Public Subnets - 2 AZs)              │ │
 │  └────────────┬───────────────────────┬───────────────┘ │
 │               │                       │                 │
-│  ┌────────────▼───────────┐ ┌────────▼───────────────┐  │
+│  ┌────────────▼───────────┐ ┌─────────▼──────────────┐  │
 │  │   ECS Fargate Task     │ │   ECS Fargate Task     │  │
 │  │   (Private Subnet)     │ │   (Private Subnet)     │  │
 │  │  ┌──────────────────┐  │ │  ┌──────────────────┐  │  │
@@ -49,192 +50,112 @@ This project demonstrates enterprise-scale DevOps and platform engineering pract
 │  │           CloudWatch (Logs, Metrics, Alarms)       │ │
 │  └────────────────────────────────────────────────────┘ │
 │                                                         │
-│  Container Registry: ECR                                │
+│  Container Registry: ECR (Shared)                       │
 │  Orchestration: ECS Cluster with Auto-scaling           │
 │  Networking: VPC with public/private subnets, NAT GW    │
 └─────────────────────────────────────────────────────────┘
 ```
 
-### Key Design Decisions
-
-1. **ECS Fargate over EKS**: Simpler operations, no cluster management, faster demo deployment
-2. **Modular Terraform**: Reusable modules enable multi-environment deployment with DRY principles
-3. **Security-first**: Multiple scanning layers, least-privilege IAM, non-root containers
-4. **Cost-optimized**: Fargate Spot for dev, right-sized tasks, log retention policies
-
 ## 🚀 Quick Start
 
 ### Prerequisites
 
-- **AWS Account** with appropriate permissions
+- **AWS Account** with appropriate permissions to create the resources in this project.
 - **Terraform** >= 1.5.0 ([Install](https://www.terraform.io/downloads))
 - **Docker** ([Install](https://docs.docker.com/get-docker/))
-- **AWS CLI** configured ([Setup](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html))
+- **AWS CLI** configured for your account ([Setup](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html))
 - **Python** 3.11+ (for local development)
 - **Make** (optional, for convenience commands)
 
-### Local Development
+### 1. Bootstrap Shared Resources
+
+First, deploy the `common` environment, which contains shared resources like ECR, the OIDC role for GitHub Actions, and the S3 bucket for Terraform state. This is a one-time setup step.
 
 ```bash
-# 1. Setup local environment
-cd app
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements-dev.txt
+# Bootstrap the common environment using the Makefile
+make bootstrap-common
+```
+This command will initialize Terraform, show you the plan, and ask for confirmation before applying.
+
+### 2. Deploy an Environment
+
+Deploy the `dev` or `prod` environments using the CI/CD pipeline or the Makefile.
+
+#### Using GitHub Actions (Recommended)
+
+- **Terraform Deploy (`terraform-deploy.yml`):** Automatically runs on push to `main` (for `dev`) or can be manually triggered to deploy the `prod` environment's infrastructure.
+- **Application Deploy (`app-cd.yml`):** Automatically runs on push to `main` (for `dev`) or can be manually triggered to deploy the application to `prod`.
+
+#### Using the Makefile
+
+```bash
+# Deploy the dev environment infrastructure
+make tf-apply ENV=dev
+
+# Deploy the prod environment infrastructure
+make tf-apply ENV=prod
+```
+
+### 3. Local Development
+
+You can run the application and tests locally without deploying to AWS.
+
+```bash
+# 1. Setup local python environment
+make setup
+
+# Activate the virtual environment
+cd app && source venv/bin/activate
 
 # 2. Run tests
-pytest tests/ -v --cov=src
+make test
 
 # 3. Run application locally
-export FLASK_ENV=development
-python -m src.app
-
-# 4. Test endpoints
-curl http://localhost:8080/health
-curl http://localhost:8080/api/hello
-curl http://localhost:8080/metrics
+make run-dev
 ```
 
-### Build and Test Docker Image
+## 📁 Project Structure
 
-```bash
-# Build image
-cd app
-docker build -t demo-app:local .
-
-# Run container
-docker run -p 8080:8080 \
-  -e ENVIRONMENT=dev \
-  -e ENABLE_CLOUDWATCH=false \
-  demo-app:local
-
-# Test health endpoint
-curl http://localhost:8080/health
+```
+.
+├── app/                          # Python Flask application
+│   ├── src/                      # Application source code
+│   ├── tests/                    # Test suite (80%+ coverage)
+│   ├── Dockerfile                # Multi-stage production build
+│   └── requirements.txt          # Python dependencies
+│
+├── terraform/                    # Infrastructure as Code
+│   ├── modules/                  # Reusable Terraform modules (VPC, ECR, ECS, etc.)
+│   └── environments/             # Environment-specific compositions
+│       ├── common/               # Shared resources (ECR, OIDC, S3)
+│       ├── dev/                  # Development environment
+│       └── prod/                 # Production environment
+│
+├── .github/                      # CI/CD pipelines
+│   ├── workflows/                # GitHub Actions workflows
+│   └── actions/                  # Reusable composite actions
+│
+├── docs/                         # Documentation
+│
+└── Makefile                      # Convenience commands for local dev and deployment
 ```
 
-### Deploy to AWS
+## 🌎 Environments
 
-#### Step 1: Setup Terraform Backend (First Time Only)
+This project uses a multi-environment strategy to isolate resources and manage the deployment lifecycle.
 
-```bash
-# Create S3 bucket for Terraform state
-aws s3 mb s3://demo-app-terraform-state-$(aws sts get-caller-identity --query Account --output text) --region us-east-1
+- **`common`**: A special environment that contains shared, foundational resources that are used by other environments. This includes the ECR container registry, the OIDC IAM role for CI/CD, and the S3 bucket for Terraform state. It is deployed once and rarely updated.
+- **`dev`**: The development environment. Deploys automatically on every push to the `main` branch, providing a rapid feedback loop for developers. It is configured for cost-savings, using smaller instances and Fargate Spot.
+- **`prod`**: The production environment. It is deployed manually or after successful validation in `dev`. It is configured for high availability and reliability, using larger instances, more replicas, and stricter security settings.
 
-# Enable versioning
-aws s3api put-bucket-versioning \
-  --bucket demo-app-terraform-state-$(aws sts get-caller-identity --query Account --output text) \
-  --versioning-configuration Status=Enabled
+## 🛡️ Security
 
-# Create DynamoDB table for state locking
-aws dynamodb create-table \
-  --table-name demo-app-terraform-locks \
-  --attribute-definitions AttributeName=LockID,AttributeType=S \
-  --key-schema AttributeName=LockID,KeyType=HASH \
-  --billing-mode PAY_PER_REQUEST \
-  --region us-east-1
-
-# Update backend configuration in terraform/environments/dev/main.tf
-# Uncomment the backend "s3" block and update bucket name
-```
-
-#### Step 2: Deploy Infrastructure
-
-```bash
-# Navigate to dev environment
-cd terraform/environments/dev
-
-# Copy example variables
-cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars if needed
-
-# Initialize Terraform
-terraform init
-
-# Review the plan
-terraform plan
-
-# Apply infrastructure
-terraform apply
-
-# Note the outputs (ALB DNS name, ECR repository URL)
-```
-
-#### Step 3: Build and Push Docker Image
-
-```bash
-# Get ECR repository URL from Terraform outputs
-ECR_REPO=$(terraform output -raw ecr_repository_url)
-AWS_REGION=us-east-1
-AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-
-# Login to ECR
-aws ecr get-login-password --region $AWS_REGION | \
-  docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
-
-# Build and tag image
-cd ../../../app
-docker build -t demo-app:latest .
-docker tag demo-app:latest $ECR_REPO:latest
-docker tag demo-app:latest $ECR_REPO:v1.0.0
-
-# Push to ECR
-docker push $ECR_REPO:latest
-docker push $ECR_REPO:v1.0.0
-```
-
-#### Step 4: Deploy Application
-
-```bash
-# Update ECS service to use new image (will deploy automatically)
-cd ../terraform/environments/dev
-
-# Force new deployment
-aws ecs update-service \
-  --cluster $(terraform output -raw ecs_cluster_name) \
-  --service $(terraform output -raw ecs_service_name) \
-  --force-new-deployment \
-  --region us-east-1
-
-# Wait for deployment to complete (2-3 minutes)
-aws ecs wait services-stable \
-  --cluster $(terraform output -raw ecs_cluster_name) \
-  --services $(terraform output -raw ecs_service_name) \
-  --region us-east-1
-```
-
-#### Step 5: Test Deployment
-
-```bash
-# Get ALB URL
-ALB_URL=$(terraform output -raw alb_url)
-
-# Test endpoints
-curl $ALB_URL/health
-curl $ALB_URL/api/hello
-curl $ALB_URL/api/info
-
-# View in browser
-open $ALB_URL/api/hello?name=DevOps
-```
-
-### Monitoring
-
-```bash
-# View ECS service status
-aws ecs describe-services \
-  --cluster $(terraform output -raw ecs_cluster_name) \
-  --services $(terraform output -raw ecs_service_name) \
-  --region us-east-1
-
-# View logs (last 10 minutes)
-aws logs tail $(terraform output -raw log_group_name) \
-  --since 10m \
-  --follow \
-  --region us-east-1
-
-# View CloudWatch metrics in AWS Console
-# Navigate to: CloudWatch > Dashboards > dev-demo-app
-```
+- ✅ **Keyless Deployments with OIDC**: Uses OpenID Connect to establish a trust relationship between GitHub Actions and AWS IAM. This allows workflows to assume an IAM role and get temporary credentials, eliminating the need for long-lived AWS access key secrets.
+- ✅ **Container Scanning**: ECR image scanning on push to detect vulnerabilities.
+- ✅ **Non-root Containers**: Follows security best practices by running the application as a non-root user.
+- ✅ **IAM Least Privilege**: Aims for least-privilege with separate IAM roles for different components (though the demo uses a broad role for simplicity).
+- ✅ **Encrypted Storage**: ECR encryption and CloudWatch Logs encryption are enabled.
+- ✅ **Restrictive Security Groups**: Default-deny security groups restrict network traffic between resources.
 
 ## 🧹 Tear Down
 
@@ -244,179 +165,26 @@ aws logs tail $(terraform output -raw log_group_name) \
 
 This repository includes a GitHub Actions workflow to safely destroy infrastructure.
 
-1. Go to the **Actions** tab in GitHub
-2. Select **Destroy Infrastructure** from the workflows list
-3. Click **Run workflow**
-4. Select the environment to destroy (e.g., `dev`, `prod`, `common`, or `all`)
-5. Type `DESTROY` in the confirmation box
-6. Click **Run workflow**
+1. Go to the **Actions** tab in GitHub.
+2. Select **Destroy Infrastructure** from the workflows list.
+3. Click **Run workflow**.
+4. Select the environment to destroy (`dev`, `prod`, or `all`).
+5. Type `DESTROY` in the confirmation box.
+6. Click **Run workflow**.
+
+*Note: Choosing `all` will destroy `dev` and `prod` first, then the `common` environment.*
 
 ### Option 2: Manual Utility
 
-```bash
-# Navigate to environment directory
-cd terraform/environments/dev
-
-# Destroy all infrastructure
-terraform destroy
-
-# Optionally, clean up Terraform state backend
-aws s3 rb s3://demo-app-terraform-state-$(aws sts get-caller-identity --query Account --output text) --force
-aws dynamodb delete-table --table-name demo-app-terraform-locks --region us-east-1
-```
-
-## 📁 Project Structure
-
-```
-.
-├── app/                          # Python Flask application
-│   ├── src/
-│   │   ├── app.py               # Application factory
-│   │   ├── config.py            # Configuration management
-│   │   ├── routes/              # API routes
-│   │   │   ├── health.py        # Health check endpoints
-│   │   │   └── api.py           # Business logic endpoints
-│   │   └── middleware/          # Middleware components
-│   │       ├── logging.py       # Structured JSON logging
-│   │       └── metrics.py       # Prometheus & CloudWatch metrics
-│   ├── tests/                   # Test suite (80%+ coverage)
-│   ├── Dockerfile               # Multi-stage production build
-│   └── requirements.txt         # Python dependencies
-│
-├── terraform/                    # Infrastructure as Code
-│   ├── modules/                 # Reusable Terraform modules
-│   │   ├── networking/          # VPC, subnets, NAT, IGW
-│   │   ├── ecr/                 # Container registry
-│   │   ├── ecs-cluster/         # ECS cluster configuration
-│   │   ├── alb/                 # Application Load Balancer
-│   │   └── ecs-service/         # ECS service, tasks, auto-scaling
-│   │
-│   └── environments/            # Environment-specific compositions
-│       ├── dev/                 # Development environment
-│       └── prod/                # Production environment (planned)
-│
-├── .github/                     # CI/CD pipelines (planned)
-│   ├── workflows/               # GitHub Actions workflows
-│   └── actions/                 # Reusable composite actions
-│
-├── docs/                        # Documentation (planned)
-│   ├── ARCHITECTURE.md         # Detailed architecture
-│   ├── DEPLOYMENT.md           # Deployment guide
-│   └── RUNBOOK.md              # Operations runbook
-│
-└── README.md                    # This file
-```
-
-## 🎯 Features & Best Practices
-
-### Application Features
-
-- ✅ **Health Check Endpoints**: `/health`, `/health/ready`, `/health/live` (Kubernetes-style probes)
-- ✅ **Metrics Export**: Prometheus `/metrics` endpoint + CloudWatch custom metrics
-- ✅ **Structured Logging**: JSON-formatted logs with request IDs and context
-- ✅ **12-Factor App**: Environment-based configuration, stateless design
-- ✅ **Production WSGI**: Gunicorn with multiple workers
-- ✅ **Comprehensive Tests**: 80%+ code coverage with pytest
-
-### Infrastructure Features
-
-- ✅ **Modular Design**: Reusable Terraform modules for all components
-- ✅ **Multi-AZ Deployment**: High availability across 2 availability zones
-- ✅ **Auto-scaling**: CPU and memory-based scaling (1-4 tasks)
-- ✅ **Security Groups**: Least-privilege network access
-- ✅ **Private Networking**: Application runs in private subnets
-- ✅ **Cost Optimization**: Fargate Spot for dev, right-sized resources
-
-### Security Features
-
-- ✅ **Container Scanning**: ECR image scanning on push
-- ✅ **Non-root Containers**: Security best practice
-- ✅ **IAM Least Privilege**: Separate task and execution roles
-- ✅ **Encrypted Storage**: ECR encryption, CloudWatch Logs encryption
-- ✅ **Security Groups**: Restrictive ingress/egress rules
-- ✅ **VPC Flow Logs**: Network traffic monitoring (optional)
-
-### Observability Features
-
-- ✅ **CloudWatch Logs**: Centralized application logs
-- ✅ **CloudWatch Metrics**: Container Insights + custom metrics
-- ✅ **Health Checks**: Multiple levels (container, ECS, ALB)
-- ✅ **Request Tracing**: Unique request IDs for correlation
-- ✅ **Structured Logging**: Queryable JSON logs
-
-## 🔧 Development
-
-### Running Tests
+If you need to destroy environments manually, use the `make` commands.
 
 ```bash
-cd app
+# Destroy the dev environment
+make tf-destroy ENV=dev
 
-# Run all tests with coverage
-pytest tests/ -v --cov=src --cov-report=html
+# Destroy the prod environment
+make tf-destroy ENV=prod
 
-# Run specific test file
-pytest tests/unit/test_health.py -v
-
-# Run with markers
-pytest -m unit  # Only unit tests
+# Finally, destroy the common environment
+make destroy-common
 ```
-
-### Code Quality
-
-```bash
-# Format code
-black src/ tests/
-
-# Lint code
-flake8 src/ tests/
-
-# Security scanning
-bandit -r src/
-safety check -r requirements.txt
-```
-
-### Local Docker Development
-
-```bash
-# Build
-docker build -t demo-app:dev -f Dockerfile .
-
-# Run with hot reload (mount source)
-docker run -p 8080:8080 \
-  -e FLASK_ENV=development \
-  -e ENABLE_CLOUDWATCH=false \
-  -v $(pwd)/src:/app/src \
-  demo-app:dev
-```
-
-## 📊 Scalability & Performance
-
-### Auto-scaling Configuration
-
-The ECS service automatically scales based on:
-- **CPU Utilization**: Target 70% (scale out at 60s, scale in at 300s)
-- **Memory Utilization**: Target 80%
-- **Capacity**: Min 1 task, Max 4 tasks
-
-### Performance Tuning
-
-- **Task Resources**: 256 CPU units (0.25 vCPU), 512 MB memory
-- **Gunicorn Workers**: 4 workers per task
-- **Health Check**: 30s interval, 5s timeout
-- **Deregistration Delay**: 30s for graceful shutdown
-
-### Cost Optimization
-
-| Component | Dev Configuration | Annual Cost (est.) |
-|-----------|------------------|-------------------|
-| ECS Fargate (Spot) | 2 tasks, 256 CPU, 512 MB | ~$130 |
-| ALB | 1 ALB | ~$220 |
-| NAT Gateway | 2 AZs | ~$720 |
-| ECR | < 10 images | ~$1 |
-| CloudWatch | Logs + metrics | ~$50 |
-| **Total** | | **~$1,121/year** |
-
-**Cost Savings**:
-- Use Fargate Spot: 70% savings on compute
-- Single NAT Gateway for dev: 50% savings on NAT
-- Disable NAT in dev: Additional ~$360/year savings (tasks can't reach internet)
