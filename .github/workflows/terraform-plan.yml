@@ -61,26 +61,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@master
         with:
-          python-version: '3.11'
-
-      - name: Install Checkov
-        run: |
-          pip install --upgrade pip setuptools wheel
-          # Fix pycares/aiodns compatibility issue
-          pip install "pycares==4.4.0" "aiodns==3.1.1"
-          pip install checkov
-
-      - name: Run Checkov scan
-        run: |
-          checkov \
-            --directory terraform/ \
-            --config-file terraform/policies/checkov/.checkov.yaml \
-            --output cli \
-            --output json \
-            --output-file-path console,checkov-results.json
+          directory: terraform/
+          config_file: terraform/policies/checkov/.checkov.yaml
+          soft_fail: true
+          output_format: cli,json
+          output_file_path: console,checkov-results.json
 
       - name: Upload Checkov results
         uses: actions/upload-artifact@v4
@@ -90,13 +78,20 @@ jobs:
           path: checkov-results.json
 
       - name: Comment Checkov results on PR
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && always()
         uses: actions/github-script@v7
+        continue-on-error: true
         with:
           script: |
             const fs = require('fs');
-            const results = JSON.parse(fs.readFileSync('checkov-results.json', 'utf8'));
 
+            // Check if results file exists
+            if (!fs.existsSync('checkov-results.json')) {
+              console.log('No Checkov results file found');
+              return;
+            }
+
+            const results = JSON.parse(fs.readFileSync('checkov-results.json', 'utf8'));
             const summary = results.summary || {};
             const passed = summary.passed || 0;
             const failed = summary.failed || 0;

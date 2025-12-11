@@ -95,12 +95,14 @@ def setup_metrics(app):  # noqa: C901
                 except ClientError as e:
                     # Log error but don't fail the request
                     logger.warning(
-                        "Failed to send metrics to CloudWatch: %s", e,
+                        "Failed to send metrics to CloudWatch: %s",
+                        e,
                         extra={"extra_fields": {"error": str(e)}},
                     )
                 except Exception as e:
                     logger.error(
-                        "Unexpected error sending CloudWatch metrics: %s", e,
+                        "Unexpected error sending CloudWatch metrics: %s",
+                        e,
                         extra={"extra_fields": {"error": str(e)}},
                     )
 
@@ -115,7 +117,8 @@ def setup_metrics(app):  # noqa: C901
             )
         except Exception as e:
             logger.error(
-                "Failed to initialize CloudWatch metrics: %s", e,
+                "Failed to initialize CloudWatch metrics: %s",
+                e,
                 extra={"extra_fields": {"error": str(e)}},
             )
 
