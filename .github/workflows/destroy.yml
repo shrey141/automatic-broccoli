@@ -33,26 +33,40 @@ jobs:
       fail-fast: false
       matrix:
         env: [dev, staging, prod]
-    if: ${{ github.event.inputs.confirm == 'DESTROY' && (github.event.inputs.environment == 'all' || github.event.inputs.environment == matrix.env) }}
+    if: ${{ github.event.inputs.confirm == 'DESTROY' }}
     steps:
+      - name: Check if environment should be destroyed
+        id: should_destroy
+        run: |
+          if [[ "${{ github.event.inputs.environment }}" == "all" ]] || [[ "${{ github.event.inputs.environment }}" == "${{ matrix.env }}" ]]; then
+            echo "destroy=true" >> $GITHUB_OUTPUT
+          else
+            echo "destroy=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Checkout code
+        if: steps.should_destroy.outputs.destroy == 'true'
         uses: actions/checkout@v6
 
       - name: Configure AWS credentials
+        if: steps.should_destroy.outputs.destroy == 'true'
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Setup Terraform
+        if: steps.should_destroy.outputs.destroy == 'true'
         uses: hashicorp/setup-terraform@v3
 
       - name: Terraform Init
+        if: steps.should_destroy.outputs.destroy == 'true'
         run: |
           cd terraform/environments/${{ matrix.env }}
           terraform init
 
       - name: Terraform Destroy
+        if: steps.should_destroy.outputs.destroy == 'true'
         run: |
           cd terraform/environments/${{ matrix.env }}
           terraform destroy -auto-approve
