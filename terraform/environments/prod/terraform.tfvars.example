@@ -1,0 +1,27 @@
+# Example Terraform variables for production environment
+# Copy this file to terraform.tfvars and customize
+
+environment = "prod"
+aws_region  = "us-east-1"
+
+# Networking (separate CIDR from dev/staging)
+vpc_cidr           = "10.2.0.0/16"
+enable_nat_gateway = true
+
+# ECS Configuration (production-grade resources)
+ecs_task_cpu       = 1024  # 1 vCPU
+ecs_task_memory    = 2048  # 2 GB
+ecs_desired_count  = 3     # Start with 3 tasks across 3 AZs
+
+# Auto-scaling (higher limits for production)
+autoscaling_min_capacity = 3   # Minimum 3 tasks for HA
+autoscaling_max_capacity = 10  # Can scale up to 10 tasks
+
+# Application
+app_version = "1.0.0"
+
+# Alerts (REQUIRED for production)
+alert_email = "production-alerts@example.com"  # Replace with real email/pager
+
+# Safety
+enable_deletion_protection = false  # Set to true to prevent accidental ALB deletion

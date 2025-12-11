@@ -1,0 +1,284 @@
+name: Deploy Application
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'app/**'
+      - 'terraform/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: demo-app
+
+jobs:
+  # Build and push Docker image (runs once, used by all environments)
+  build:
+    name: Build & Push Image
+    runs-on: ubuntu-latest
+    # Concurrency: Only one build at a time
+    concurrency:
+      group: build-${{ github.ref }}
+      cancel-in-progress: false  # Don't cancel builds, queue them
+
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}
+          tags: |
+            type=sha,prefix=,format=short
+            type=raw,value=latest
+            type=semver,pattern={{version}}
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: ./app
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # Deploy to Dev (automatic)
+  deploy-dev:
+    name: Deploy to Dev
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: dev
+      url: ${{ steps.deploy.outputs.url }}
+    # Concurrency: Only one dev deployment at a time, cancel in-progress
+    concurrency:
+      group: deploy-dev
+      cancel-in-progress: true  # Dev can cancel old deploys
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy to ECS
+        id: deploy
+        run: |
+          CLUSTER=$(aws ecs list-clusters --query "clusterArns[?contains(@, 'dev-demo-cluster')]" --output text | xargs basename)
+          SERVICE=$(aws ecs list-services --cluster $CLUSTER --query "serviceArns[0]" --output text | xargs basename)
+
+          echo "Updating service $SERVICE in cluster $CLUSTER..."
+
+          aws ecs update-service \
+            --cluster $CLUSTER \
+            --service $SERVICE \
+            --force-new-deployment \
+            --region ${{ env.AWS_REGION }}
+
+          echo "Waiting for service to stabilize..."
+          aws ecs wait services-stable \
+            --cluster $CLUSTER \
+            --services $SERVICE \
+            --region ${{ env.AWS_REGION }}
+
+          # Get ALB URL
+          ALB_DNS=$(aws elbv2 describe-load-balancers \
+            --query "LoadBalancers[?contains(LoadBalancerName, 'dev-alb')].DNSName" \
+            --output text)
+
+          echo "url=http://${ALB_DNS}" >> $GITHUB_OUTPUT
+          echo "✅ Deployed to Dev: http://${ALB_DNS}"
+
+      - name: Smoke test
+        run: |
+          URL="${{ steps.deploy.outputs.url }}"
+
+          # Wait for ALB to register targets
+          sleep 30
+
+          # Test health endpoint
+          for i in {1..10}; do
+            if curl -f -s "${URL}/health" > /dev/null; then
+              echo "✅ Health check passed"
+              exit 0
+            fi
+            echo "Attempt $i failed, retrying..."
+            sleep 10
+          done
+
+          echo "❌ Health check failed after 10 attempts"
+          exit 1
+
+  # Deploy to Staging (automatic after dev success)
+  deploy-staging:
+    name: Deploy to Staging
+    needs: [build, deploy-dev]
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: ${{ steps.deploy.outputs.url }}
+    # Concurrency: Only one staging deployment, queue them (don't cancel)
+    concurrency:
+      group: deploy-staging
+      cancel-in-progress: false  # Staging should complete
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy to ECS
+        id: deploy
+        run: |
+          CLUSTER=$(aws ecs list-clusters --query "clusterArns[?contains(@, 'staging-demo-cluster')]" --output text | xargs basename)
+          SERVICE=$(aws ecs list-services --cluster $CLUSTER --query "serviceArns[0]" --output text | xargs basename)
+
+          aws ecs update-service \
+            --cluster $CLUSTER \
+            --service $SERVICE \
+            --force-new-deployment \
+            --region ${{ env.AWS_REGION }}
+
+          aws ecs wait services-stable \
+            --cluster $CLUSTER \
+            --services $SERVICE \
+            --region ${{ env.AWS_REGION }}
+
+          ALB_DNS=$(aws elbv2 describe-load-balancers \
+            --query "LoadBalancers[?contains(LoadBalancerName, 'staging-alb')].DNSName" \
+            --output text)
+
+          echo "url=http://${ALB_DNS}" >> $GITHUB_OUTPUT
+
+      - name: Run integration tests
+        run: |
+          URL="${{ steps.deploy.outputs.url }}"
+
+          # More comprehensive tests for staging
+          curl -f "${URL}/health" || exit 1
+          curl -f "${URL}/api/hello" || exit 1
+          curl -f "${URL}/api/info" || exit 1
+
+          echo "✅ Integration tests passed"
+
+  # Deploy to Prod (manual approval required)
+  deploy-prod:
+    name: Deploy to Production
+    needs: [build, deploy-staging]
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.url }}
+    # Concurrency: Only one prod deployment, never cancel
+    concurrency:
+      group: deploy-prod
+      cancel-in-progress: false  # Production must complete
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy to ECS
+        id: deploy
+        run: |
+          CLUSTER=$(aws ecs list-clusters --query "clusterArns[?contains(@, 'prod-demo-cluster')]" --output text | xargs basename)
+          SERVICE=$(aws ecs list-services --cluster $CLUSTER --query "serviceArns[0]" --output text | xargs basename)
+
+          echo "🚀 Deploying to PRODUCTION"
+
+          aws ecs update-service \
+            --cluster $CLUSTER \
+            --service $SERVICE \
+            --force-new-deployment \
+            --region ${{ env.AWS_REGION }}
+
+          aws ecs wait services-stable \
+            --cluster $CLUSTER \
+            --services $SERVICE \
+            --region ${{ env.AWS_REGION }}
+
+          ALB_DNS=$(aws elbv2 describe-load-balancers \
+            --query "LoadBalancers[?contains(LoadBalancerName, 'prod-alb')].DNSName" \
+            --output text)
+
+          echo "url=https://${ALB_DNS}" >> $GITHUB_OUTPUT
+
+      - name: Production smoke test
+        run: |
+          URL="${{ steps.deploy.outputs.url }}"
+
+          sleep 60  # Wait longer for production
+
+          curl -f "${URL}/health" || exit 1
+          curl -f "${URL}/api/hello" || exit 1
+
+          echo "✅ Production deployment successful"
+
+      - name: Notify team
+        if: always()
+        run: |
+          STATUS="${{ job.status }}"
+          if [ "$STATUS" == "success" ]; then
+            echo "✅ Production deployment SUCCESSFUL"
+            # Add Slack/email notification here
+          else
+            echo "❌ Production deployment FAILED"
+            # Add alert here
+          fi

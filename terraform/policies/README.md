@@ -1,0 +1,381 @@
+# Policy as Code - Terraform Security & Compliance
+
+This directory contains automated policy checks for Terraform infrastructure code using two complementary tools:
+
+1. **Checkov** - AWS best practices and security checks
+2. **OPA (Open Policy Agent)** - Custom business rules and organizational policies
+
+## 🎯 Purpose
+
+Policy as Code ensures:
+- ✅ **Security**: Prevent insecure configurations before deployment
+- ✅ **Compliance**: Enforce organizational standards automatically
+- ✅ **Cost Control**: Catch expensive misconfigurations early
+- ✅ **Consistency**: Same rules across all environments
+- ✅ **Shift-Left**: Find issues in PR review, not in production
+
+## 📁 Directory Structure
+
+```
+terraform/policies/
+├── checkov/
+│   └── .checkov.yaml          # Checkov configuration
+├── opa/
+│   ├── terraform.rego         # OPA policy rules
+│   └── terraform_test.rego    # OPA policy tests
+└── README.md                  # This file
+```
+
+## 🔧 Checkov - AWS Security Best Practices
+
+### What Checkov Checks
+
+Checkov scans for **50+ AWS security best practices**, including:
+
+**ECS Security:**
+- ✅ Task definitions have memory/CPU limits
+- ✅ Containers run as non-root users
+- ✅ Data encrypted in transit
+
+**IAM Security:**
+- ✅ No wildcard permissions (`*:*`)
+- ✅ No overly permissive policies
+- ✅ Policies attached to roles, not users
+
+**Network Security:**
+- ✅ Security groups have descriptions
+- ✅ No unrestricted SSH (0.0.0.0/0:22)
+- ✅ No unrestricted RDP (0.0.0.0/0:3389)
+
+**CloudWatch & Logging:**
+- ✅ Log groups encrypted at rest
+- ✅ Log retention policies set
+
+**ECR Security:**
+- ✅ Image scanning enabled
+- ✅ KMS encryption enabled
+
+### Configuration
+
+See `.checkov.yaml` for the complete configuration.
+
+**Key settings:**
+```yaml
+framework: terraform
+soft-fail: true  # Warning mode (change to false for strict enforcement)
+check: [CKV_AWS_8, CKV_AWS_111, ...]  # Specific checks to run
+skip-check: [CKV_AWS_2, ...]          # Checks to skip (with justification)
+```
+
+### Running Checkov Locally
+
+```bash
+# Install
+pip install checkov
+
+# Scan all Terraform
+checkov -d terraform/ --config-file terraform/policies/checkov/.checkov.yaml
+
+# Scan specific environment
+checkov -d terraform/environments/dev --config-file terraform/policies/checkov/.checkov.yaml
+
+# Get JSON output
+checkov -d terraform/ --config-file terraform/policies/checkov/.checkov.yaml --output json
+
+# Use Makefile
+make scan-iac
+```
+
+### Example Output
+
+```
+Check: CKV_AWS_8: "Ensure ECS task definition has memory limit"
+	PASSED for resource: aws_ecs_task_definition.main
+	File: /terraform/modules/ecs-service/main.tf:85-150
+
+Check: CKV_AWS_111: "Ensure IAM policies does not allow write access without constraints"
+	FAILED for resource: aws_iam_role_policy.bad_policy
+	File: /terraform/modules/ecs-service/main.tf:200-215
+	Guide: https://docs.bridgecrew.io/docs/iam_write_access_without_constraint
+
+	85 | resource "aws_iam_role_policy" "bad_policy" {
+	86 |   policy = {
+	87 |     Action = "*"        # ❌ Wildcard permissions
+	88 |     Resource = "*"      # ❌ All resources
+	89 |   }
+	90 | }
+```
+
+## 🛡️ OPA - Custom Business Rules
+
+### What OPA Checks
+
+OPA enforces **organizational policies** beyond AWS best practices:
+
+**Required Tags Policy:**
+- ✅ All resources must have: `Environment`, `Project`, `ManagedBy`
+- ✅ Catches untagged resources before deployment
+
+**ECS Policies:**
+- ✅ Task definitions must use CloudWatch logging
+- ✅ Memory and CPU limits are required
+- ✅ Containers must specify log configuration
+
+**Security Group Policies:**
+- ✅ Security groups must have descriptions
+- ✅ No unrestricted access to sensitive ports (22, 3306, 5432, etc.)
+
+**CloudWatch Policies:**
+- ✅ Log groups must have retention policies
+- ✅ Retention limits based on environment:
+  - Dev: max 7 days
+  - Staging: max 30 days
+  - Prod: max 365 days
+
+**IAM Policies:**
+- ✅ No wildcard actions (`Action: "*"`)
+- ✅ No wildcard resources (with exceptions for CloudWatch)
+
+**Naming Conventions:**
+- ✅ Resources follow pattern: `{environment}-{service}-{type}`
+- ✅ ECS clusters, ALBs, log groups enforced
+
+### OPA Policy Language
+
+OPA uses **Rego**, a declarative policy language:
+
+```rego
+# Deny resources missing required tags
+deny[msg] {
+    resource := input.resource_changes[_]
+    resource_supports_tags(resource.type)
+
+    missing_tags := required_tags - {tag | resource.change.after.tags[tag]}
+    count(missing_tags) > 0
+
+    msg := sprintf("Resource '%s' missing tags: %v", [resource.address, missing_tags])
+}
+```
+
+### Running OPA Locally
+
+```bash
+# Install OPA
+curl -L -o opa https://openpolicyagent.org/downloads/latest/opa_linux_amd64
+chmod +x opa
+sudo mv opa /usr/local/bin/
+
+# Test policies
+opa test terraform/policies/opa/
+
+# Evaluate policy against Terraform plan
+cd terraform/environments/dev
+terraform plan -out=tfplan
+terraform show -json tfplan > tfplan.json
+
+opa eval \
+  --data ../../policies/opa/terraform.rego \
+  --input tfplan.json \
+  --format pretty \
+  'data.terraform.policies.deny'
+```
+
+### Example Output
+
+**No violations:**
+```
+set()
+✅ All policies passed
+```
+
+**With violations:**
+```
+{
+  "Resource 'aws_vpc.main' (aws_vpc) is missing required tags: {\"ManagedBy\"}",
+  "Security group 'aws_security_group.test' must have a description",
+  "CloudWatch log group '/ecs/dev/app' must specify retention_in_days"
+}
+❌ 3 policy violations found
+```
+
+## 🔄 CI/CD Integration
+
+### GitHub Actions Workflow
+
+The `.github/workflows/terraform-plan.yml` workflow automatically runs both tools:
+
+```yaml
+jobs:
+  checkov:
+    - Install Checkov
+    - Scan all Terraform code
+    - Comment results on PR
+
+  opa:
+    - Install OPA
+    - Test OPA policies
+    - Run policies against terraform plan
+    - Fail if violations found
+
+  plan:
+    - Generate Terraform plan
+    - Comment plan on PR
+```
+
+### Workflow Triggers
+
+```yaml
+on:
+  pull_request:
+    paths: ['terraform/**']  # Only when Terraform changes
+  push:
+    branches: [main]
+```
+
+### Policy Enforcement Strategy
+
+| Tool | Mode | Action on Violation |
+|------|------|---------------------|
+| **Checkov** | Soft-fail | ⚠️ Warning (doesn't block merge) |
+| **OPA** | Hard-fail | ❌ Blocks merge |
+| **Terraform Validate** | Hard-fail | ❌ Blocks merge |
+
+**Rationale:**
+- **Checkov** in soft-fail mode because some checks are aspirational (e.g., HTTPS, which we'll add later)
+- **OPA** in hard-fail mode because these are critical organizational policies
+- Can flip Checkov to hard-fail for production: `soft-fail: false`
+
+## 📊 Policy Coverage
+
+### Current Policy Count
+
+- **Checkov Checks:** 30+ enabled
+- **OPA Custom Rules:** 10+ policies
+- **Total Coverage:** 40+ automated checks
+
+### Policy Categories
+
+| Category | Checkov | OPA | Total |
+|----------|---------|-----|-------|
+| Tagging | - | 1 | 1 |
+| ECS Security | 3 | 3 | 6 |
+| IAM Security | 8 | 2 | 10 |
+| Network Security | 6 | 2 | 8 |
+| Logging | 2 | 2 | 4 |
+| Naming Conventions | - | 1 | 1 |
+| Other | 11 | 2 | 13 |
+
+## 🎓 Writing Custom OPA Policies
+
+### Template for New Policy
+
+```rego
+# Policy: Descriptive name
+deny[msg] {
+    # 1. Select resources to check
+    resource := input.resource_changes[_]
+    resource.type == "aws_example_resource"
+    resource.change.actions[_] != "delete"  # Ignore deletions
+
+    # 2. Define the violation condition
+    not resource.change.after.required_field
+
+    # 3. Create helpful error message
+    msg := sprintf(
+        "Resource '%s' must have required_field set",
+        [resource.address]
+    )
+}
+```
+
+### Testing Your Policy
+
+```bash
+# Add test to terraform_test.rego
+test_my_new_policy {
+    msg := "Expected error message"
+    msg in deny with input as { ... }
+}
+
+# Run tests
+opa test terraform/policies/opa/
+```
+
+## 🔒 Security Best Practices
+
+### 1. Keep Policies Updated
+```bash
+# Update Checkov regularly
+pip install --upgrade checkov
+
+# Check OPA releases
+opa version
+```
+
+### 2. Review Policy Violations
+- Don't blindly skip checks
+- Document why in `.checkov.yaml`
+- Get security team approval
+
+### 3. Test Before Enforcing
+- Start with soft-fail mode
+- Monitor false positive rate
+- Gradually enable hard-fail
+
+### 4. Version Control Policies
+- Treat policies as code
+- Review changes in PRs
+- Test policy changes
+
+## 📈 Metrics & Reporting
+
+### View Policy Trends
+
+```bash
+# Count violations over time
+checkov -d terraform/ --output json | jq '.summary'
+
+# Generate HTML report
+checkov -d terraform/ --output html --output-file report.html
+```
+
+### Integration with Security Tools
+
+Both tools support SARIF output for GitHub Security:
+
+```yaml
+- name: Upload Checkov SARIF
+  uses: github/codeql-action/upload-sarif@v2
+  with:
+    sarif_file: checkov.sarif
+```
+
+## 🎤 Interview Talking Points
+
+**"Tell me about your policy as code implementation"**
+
+> "I use a layered approach with Checkov for AWS best practices and OPA for custom business rules. Checkov catches 30+ security issues like missing encryption or overly permissive IAM policies. OPA enforces our organizational standards like required tags and naming conventions. Both run automatically in CI/CD, with Checkov in warning mode and OPA blocking merges on violations."
+
+**"How do you balance security with developer velocity?"**
+
+> "I use soft-fail mode for Checkov initially, allowing developers to see issues without blocking them. Critical organizational policies use OPA in hard-fail mode. We document all skipped checks with justifications in the config file. This 'paved road' approach guides developers toward secure patterns while keeping them productive."
+
+**"Can you show me an example of a custom policy?"**
+
+> "Sure, here's our required tags policy [show OPA code]. It ensures every resource has Environment, Project, and ManagedBy tags. This enables cost allocation, ownership tracking, and automated cleanup. We tested it in soft-fail mode first, fixed existing violations, then enabled hard-fail."
+
+## 📚 Additional Resources
+
+- [Checkov Documentation](https://www.checkov.io/)
+- [OPA Documentation](https://www.openpolicyagent.org/)
+- [Rego Playground](https://play.openpolicyagent.org/)
+- [Terraform Compliance](https://terraform-compliance.com/)
+
+## 🚀 Next Steps
+
+1. ✅ Policies created and tested
+2. ⬜ Enable GitHub Security tab for SARIF uploads
+3. ⬜ Add Slack notifications for policy violations
+4. ⬜ Create policy dashboard (failed checks over time)
+5. ⬜ Write policies for S3, RDS (if added later)
+6. ⬜ Flip Checkov to hard-fail mode for production

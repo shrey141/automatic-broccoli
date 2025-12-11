@@ -1,0 +1,19 @@
+# Flask web framework
+Flask==3.0.0
+Werkzeug==3.0.1
+
+# Production WSGI server
+gunicorn==21.2.0
+
+# CORS support
+Flask-Cors==4.0.0
+
+# Prometheus metrics exporter
+prometheus-flask-exporter==0.23.0
+
+# AWS SDK for CloudWatch integration
+boto3==1.34.20
+botocore==1.34.20
+
+# For production reliability
+python-json-logger==2.0.7
