@@ -104,7 +104,9 @@ jobs:
             const failed = summary.failed || 0;
             const skipped = summary.skipped || 0;
 
-            const body = `## 🔒 Checkov Security Scan Results
+            const commentIdentifier = '<!-- checkov-scan-results -->';
+            const body = `${commentIdentifier}
+            ## 🔒 Checkov Security Scan Results
 
             | Status | Count |
             |--------|-------|
@@ -115,12 +117,34 @@ jobs:
             ${failed > 0 ? '⚠️ **Security issues detected!** Review the workflow logs for details.' : '✅ **No security issues detected!**'}
             `;
 
-            github.rest.issues.createComment({
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: body
             });
+
+            const existingComment = comments.find(comment =>
+              comment.body.includes(commentIdentifier)
+            );
+
+            if (existingComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                comment_id: existingComment.id,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: body
+              });
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: body
+              });
+            }
 
   # Terraform plan for each environment
   plan:
@@ -173,7 +197,9 @@ jobs:
               ? planOutput.substring(0, maxLength) + '\n\n... (truncated)'
               : planOutput;
 
-            const body = `## 📋 Terraform Plan - ${{ matrix.environment }}
+            const commentIdentifier = '<!-- terraform-plan-${{ matrix.environment }} -->';
+            const body = `${commentIdentifier}
+            ## 📋 Terraform Plan - ${{ matrix.environment }}
 
             <details>
             <summary>Click to expand plan</summary>
@@ -185,12 +211,34 @@ jobs:
             </details>
             `;
 
-            github.rest.issues.createComment({
+            // Find existing comment for this environment
+            const { data: comments } = await github.rest.issues.listComments({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: body
             });
+
+            const existingComment = comments.find(comment =>
+              comment.body.includes(commentIdentifier)
+            );
+
+            if (existingComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                comment_id: existingComment.id,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: body
+              });
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: body
+              });
+            }
 
   # Summary of all checks
   summary:

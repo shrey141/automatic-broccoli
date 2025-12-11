@@ -137,3 +137,13 @@ module "observability" {
 
   tags = local.common_tags
 }
+
+# OIDC Module
+module "oidc" {
+  source = "../../modules/oidc"
+
+  url             = "https://token.actions.githubusercontent.com"
+  client_id_list  = ["sts.amazonaws.com"]
+  thumbprint_list = ["6938fd4eb5fadce486e936c207b5894b425216a4"] # Example thumbprint
+}
+
