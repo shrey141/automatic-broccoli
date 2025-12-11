@@ -72,3 +72,6 @@ build/
 # Local environment
 .env
 .env.local
+*.terraform.lock.hcl
+*tfplan
+info.txt

@@ -14,3 +14,24 @@ variable "thumbprint_list" {
   type        = list(string)
 }
 
+variable "role_name" {
+  description = "Name for the IAM role."
+  type        = string
+  default     = "github-actions-role"
+}
+
+variable "github_owner" {
+  description = "The GitHub organization or user."
+  type        = string
+}
+
+variable "github_repo" {
+  description = "The GitHub repository."
+  type        = string
+}
+
+variable "branch_name" {
+  description = "The git branch to allow."
+  type        = string
+  default     = "main"
+}

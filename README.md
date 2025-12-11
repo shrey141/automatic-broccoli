@@ -27,12 +27,12 @@ This project demonstrates enterprise-scale DevOps and platform engineering pract
        │
        ▼
 ┌─────────────────────────────────────────────────────────┐
-│                     AWS Cloud                            │
+│                     AWS Cloud                           │
 │  ┌────────────────────────────────────────────────────┐ │
-│  │               Application Load Balancer             │ │
+│  │               Application Load Balancer            │ │
 │  │              (Public Subnets - 2 AZs)              │ │
-│  └────────────┬───────────────────────┬────────────────┘ │
-│               │                       │                   │
+│  └────────────┬───────────────────────┬───────────────┘ │
+│               │                       │                 │
 │  ┌────────────▼───────────┐ ┌────────▼───────────────┐  │
 │  │   ECS Fargate Task     │ │   ECS Fargate Task     │  │
 │  │   (Private Subnet)     │ │   (Private Subnet)     │  │
@@ -43,16 +43,16 @@ This project demonstrates enterprise-scale DevOps and platform engineering pract
 │  │  │  - Logging       │  │ │  │  - Logging       │  │  │
 │  │  └──────────────────┘  │ │  └──────────────────┘  │  │
 │  └────────────┬───────────┘ └────────┬───────────────┘  │
-│               │                      │                   │
-│               ▼                      ▼                   │
+│               │                      │                  │
+│               ▼                      ▼                  │
 │  ┌────────────────────────────────────────────────────┐ │
 │  │           CloudWatch (Logs, Metrics, Alarms)       │ │
 │  └────────────────────────────────────────────────────┘ │
-│                                                          │
+│                                                         │
 │  Container Registry: ECR                                │
-│  Orchestration: ECS Cluster with Auto-scaling          │
-│  Networking: VPC with public/private subnets, NAT GW   │
-└──────────────────────────────────────────────────────────┘
+│  Orchestration: ECS Cluster with Auto-scaling           │
+│  Networking: VPC with public/private subnets, NAT GW    │
+└─────────────────────────────────────────────────────────┘
 ```
 
 ### Key Design Decisions
@@ -240,6 +240,19 @@ aws logs tail $(terraform output -raw log_group_name) \
 
 **⚠️ Important**: Tearing down will delete all resources and data. This action cannot be undone.
 
+### Option 1: Automated Pipeline (Recommended)
+
+This repository includes a GitHub Actions workflow to safely destroy infrastructure.
+
+1. Go to the **Actions** tab in GitHub
+2. Select **Destroy Infrastructure** from the workflows list
+3. Click **Run workflow**
+4. Select the environment to destroy (e.g., `dev`, `staging`, `prod`, `common`, or `all`)
+5. Type `DESTROY` in the confirmation box
+6. Click **Run workflow**
+
+### Option 2: Manual Utility
+
 ```bash
 # Navigate to environment directory
 cd terraform/environments/dev
@@ -408,47 +421,3 @@ The ECS service automatically scales based on:
 - Use Fargate Spot: 70% savings on compute
 - Single NAT Gateway for dev: 50% savings on NAT
 - Disable NAT in dev: Additional ~$360/year savings (tasks can't reach internet)
-
-## 🎤 Interview Talking Points
-
-### 1. Platform Engineering Mindset
-"This demonstrates **platform thinking** through reusable Terraform modules and GitHub Actions that can scale across teams. The networking module, for example, is used identically across dev, staging, and prod—change once, deploy everywhere."
-
-### 2. Production-Ready Practices
-"I've implemented **production best practices** like multi-stage Docker builds for security, non-root containers, comprehensive health checks at multiple levels, structured JSON logging for observability, and auto-scaling based on actual metrics."
-
-### 3. Security Posture
-"Security is **layered**: container image scanning in ECR, dependency scanning with Safety/Bandit, infrastructure scanning with Checkov (planned), least-privilege IAM roles, private subnets for compute, and encryption at rest."
-
-### 4. Observability Strategy
-"The observability follows the **three pillars**: metrics via Prometheus and CloudWatch, structured JSON logs for debugging with request correlation, and health checks at container, ECS, and ALB levels. In production, I'd add X-Ray for distributed tracing."
-
-### 5. Scalability
-"This scales in **multiple dimensions**: horizontally via ECS auto-scaling, across environments using the same Terraform modules with different variables, and across teams through reusable components. The module structure supports hundreds of services."
-
-### 6. Cost Consciousness
-"I'm **cost-aware**: using Fargate Spot for dev (70% savings), right-sizing tasks based on actual needs, implementing log retention policies, and providing options to reduce NAT Gateway costs. This dev environment costs ~$1,100/year."
-
-## 🤝 Contributing
-
-This is a demonstration project for interview purposes. Suggestions and improvements are welcome!
-
-## 📄 License
-
-MIT License - See [LICENSE](LICENSE) file for details.
-
-## 👤 Author
-
-Built as a demonstration of modern platform engineering practices for interview evaluation.
-
----
-
-**Next Steps**:
-1. ✅ Deploy to dev environment
-2. ⬜ Implement CI/CD pipelines (GitHub Actions)
-3. ⬜ Add policy as code (OPA/Checkov)
-4. ⬜ Create CloudWatch dashboards
-5. ⬜ Add staging and prod environments
-6. ⬜ Implement blue-green deployments
-
-**Questions?** Review the architecture diagram above or check the code comments for detailed explanations.

@@ -43,25 +43,25 @@ run-dev: ## Run application in development mode
 
 ##@ Infrastructure
 
-tf-init: ## Initialize Terraform for specified environment (ENV=dev|staging|prod)
+tf-init: ## Initialize Terraform for specified environment (ENV=dev|staging|prod|common)
 	@echo "\033[1;34m→ Initializing Terraform for $(ENV) environment...\033[0m"
 	cd terraform/environments/$(ENV) && terraform init
 
-tf-plan: ## Plan Terraform changes (ENV=dev|staging|prod)
+tf-plan: ## Plan Terraform changes (ENV=dev|staging|prod|common)
 	@echo "\033[1;34m→ Planning Terraform changes for $(ENV) environment...\033[0m"
 	cd terraform/environments/$(ENV) && terraform plan -out=tfplan
 
-tf-apply: ## Apply Terraform changes (ENV=dev|staging|prod)
+tf-apply: ## Apply Terraform changes (ENV=dev|staging|prod|common)
 	@echo "\033[1;34m→ Applying Terraform changes for $(ENV) environment...\033[0m"
 	cd terraform/environments/$(ENV) && terraform apply tfplan
 
-tf-destroy: ## Destroy Terraform infrastructure (ENV=dev|staging|prod)
+tf-destroy: ## Destroy Terraform infrastructure (ENV=dev|staging|prod|common)
 	@echo "\033[1;31m⚠️  WARNING: This will destroy all infrastructure in $(ENV) environment!\033[0m"
 	@echo "Press Ctrl+C to cancel, or wait 5 seconds to continue..."
 	@sleep 5
 	cd terraform/environments/$(ENV) && terraform destroy
 
-tf-output: ## Show Terraform outputs (ENV=dev|staging|prod)
+tf-output: ## Show Terraform outputs (ENV=dev|staging|prod|common)
 	@cd terraform/environments/$(ENV) && terraform output
 
 tf-fmt: ## Format all Terraform files
@@ -116,6 +116,12 @@ deploy-service: ## Deploy new version to ECS (ENV=dev|staging|prod)
 	@echo "\033[1;32m✓ Service deployed successfully!\033[0m"
 
 deploy: deploy-image deploy-service ## Full deployment: build, push, and deploy
+
+deploy-common: ## Deploy common configuration to AWS
+	@echo "\033[1;34m→ Deploying common configuration...\033[0m"
+	$(MAKE) tf-init ENV=common
+	$(MAKE) tf-plan ENV=common
+	$(MAKE) tf-apply ENV=common
 
 ##@ Monitoring
 
