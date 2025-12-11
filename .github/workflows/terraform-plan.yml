@@ -36,11 +36,13 @@ jobs:
 
       - name: Terraform Init (all environments)
         run: |
+          set -e
           for env in dev staging prod; do
             echo "Initializing $env environment..."
             cd terraform/environments/$env
             terraform init -backend=false
             cd ../../..
+            echo "✓ $env initialized"
           done
 
       - name: Terraform Validate (all environments)

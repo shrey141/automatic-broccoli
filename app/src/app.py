@@ -4,6 +4,7 @@ Creates and configures the Flask application with all middleware and routes.
 """
 
 import logging
+import os
 from flask import Flask
 from flask_cors import CORS
 
@@ -37,6 +38,14 @@ def create_app(config_name=None):
 
     # Enable CORS for development/testing
     CORS(app)
+    # Enable CORS with environment-specific restrictions
+    if app.config.get("ENVIRONMENT") in ["dev", "development"]:
+        CORS(app)  # Allow all origins in development
+    else:
+        # Restrict origins in staging/production
+        allowed_origins = os.environ.get("CORS_ORIGINS", "").split(",")
+        if allowed_origins:
+            CORS(app, origins=allowed_origins)
 
     # Register blueprints
     app.register_blueprint(health.bp)

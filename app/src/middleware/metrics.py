@@ -100,7 +100,7 @@ def setup_metrics(app):  # noqa: C901
                         extra={"extra_fields": {"error": str(e)}},
                     )
                 except Exception as e:
-                    logger.error(
+                    logger.exception(
                         "Unexpected error sending CloudWatch metrics: %s",
                         e,
                         extra={"extra_fields": {"error": str(e)}},
@@ -116,7 +116,7 @@ def setup_metrics(app):  # noqa: C901
                 "Install boto3 to enable CloudWatch integration."
             )
         except Exception as e:
-            logger.error(
+            logger.exception(
                 "Failed to initialize CloudWatch metrics: %s",
                 e,
                 extra={"extra_fields": {"error": str(e)}},

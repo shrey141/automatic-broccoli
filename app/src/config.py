@@ -24,7 +24,7 @@ class Config:
     # Observability
     LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
     ENABLE_METRICS = os.environ.get("ENABLE_METRICS", "true").lower() == "true"
-    ENABLE_CLOUDWATCH = os.environ.get("ENABLE_CLOUDWATCH", "true").lower() == "true"
+    ENABLE_CLOUDWATCH = os.environ.get("ENABLE_CLOUDWATCH", "false").lower() == "true"
 
     # Server
     PORT = int(os.environ.get("PORT", 8080))

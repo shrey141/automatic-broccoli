@@ -110,10 +110,53 @@ jobs:
       - name: Deploy to ECS
         id: deploy
         run: |
-          CLUSTER=$(aws ecs list-clusters --query "clusterArns[?contains(@, 'dev-demo-cluster')]" --output text | xargs basename)
-          SERVICE=$(aws ecs list-services --cluster $CLUSTER --query "serviceArns[0]" --output text | xargs basename)
+          set -euo pipefail  # Exit on error, undefined vars, pipe failures
 
-          echo "Updating service $SERVICE in cluster $CLUSTER..."
+          echo "🔍 Finding ECS cluster and service..."
+
+          # Query for cluster ARNs matching pattern
+          CLUSTER_ARNS=$(aws ecs list-clusters \
+            --region ${{ env.AWS_REGION }} \
+            --query "clusterArns[?contains(@, 'dev-demo-cluster')]" \
+            --output text)
+
+          # Validate exactly one cluster found
+          CLUSTER_COUNT=$(echo "$CLUSTER_ARNS" | wc -w)
+          if [ "$CLUSTER_COUNT" -eq 0 ]; then
+            echo "❌ ERROR: No ECS cluster found matching 'dev-demo-cluster'"
+            exit 1
+          elif [ "$CLUSTER_COUNT" -gt 1 ]; then
+            echo "❌ ERROR: Multiple ECS clusters found matching 'dev-demo-cluster':"
+            echo "$CLUSTER_ARNS"
+            exit 1
+          fi
+
+          CLUSTER=$(echo "$CLUSTER_ARNS" | xargs basename)
+          echo "✓ Found cluster: $CLUSTER"
+
+          # Query for service ARNs in the cluster
+          SERVICE_ARNS=$(aws ecs list-services \
+            --cluster "$CLUSTER" \
+            --region ${{ env.AWS_REGION }} \
+            --query "serviceArns" \
+            --output text)
+
+          # Validate exactly one service found
+          SERVICE_COUNT=$(echo "$SERVICE_ARNS" | wc -w)
+          if [ "$SERVICE_COUNT" -eq 0 ]; then
+            echo "❌ ERROR: No ECS service found in cluster '$CLUSTER'"
+            exit 1
+          elif [ "$SERVICE_COUNT" -gt 1 ]; then
+            echo "❌ ERROR: Multiple ECS services found in cluster '$CLUSTER':"
+            echo "$SERVICE_ARNS"
+            echo "Please specify which service to deploy"
+            exit 1
+          fi
+
+          SERVICE=$(echo "$SERVICE_ARNS" | xargs basename)
+          echo "✓ Found service: $SERVICE"
+
+          echo "🚀 Updating service $SERVICE in cluster $CLUSTER..."
 
           aws ecs update-service \
             --cluster $CLUSTER \
@@ -121,7 +164,7 @@ jobs:
             --force-new-deployment \
             --region ${{ env.AWS_REGION }}
 
-          echo "Waiting for service to stabilize..."
+          echo "⏳ Waiting for service to stabilize..."
           aws ecs wait services-stable \
             --cluster $CLUSTER \
             --services $SERVICE \
@@ -129,11 +172,17 @@ jobs:
 
           # Get ALB URL
           ALB_DNS=$(aws elbv2 describe-load-balancers \
+            --region ${{ env.AWS_REGION }} \
             --query "LoadBalancers[?contains(LoadBalancerName, 'dev-alb')].DNSName" \
             --output text)
 
-          echo "url=http://${ALB_DNS}" >> $GITHUB_OUTPUT
-          echo "✅ Deployed to Dev: http://${ALB_DNS}"
+          if [ -z "$ALB_DNS" ]; then
+            echo "⚠️  WARNING: Could not find ALB DNS name"
+            echo "url=unknown" >> $GITHUB_OUTPUT
+          else
+            echo "url=http://${ALB_DNS}" >> $GITHUB_OUTPUT
+            echo "✅ Deployed to Dev: http://${ALB_DNS}"
+          fi
 
       - name: Smoke test
         run: |
@@ -181,25 +230,79 @@ jobs:
       - name: Deploy to ECS
         id: deploy
         run: |
-          CLUSTER=$(aws ecs list-clusters --query "clusterArns[?contains(@, 'staging-demo-cluster')]" --output text | xargs basename)
-          SERVICE=$(aws ecs list-services --cluster $CLUSTER --query "serviceArns[0]" --output text | xargs basename)
+          set -euo pipefail  # Exit on error, undefined vars, pipe failures
+
+          echo "🔍 Finding ECS cluster and service..."
+
+          # Query for cluster ARNs matching pattern
+          CLUSTER_ARNS=$(aws ecs list-clusters \
+            --region ${{ env.AWS_REGION }} \
+            --query "clusterArns[?contains(@, 'staging-demo-cluster')]" \
+            --output text)
+
+          # Validate exactly one cluster found
+          CLUSTER_COUNT=$(echo "$CLUSTER_ARNS" | wc -w)
+          if [ "$CLUSTER_COUNT" -eq 0 ]; then
+            echo "❌ ERROR: No ECS cluster found matching 'staging-demo-cluster'"
+            exit 1
+          elif [ "$CLUSTER_COUNT" -gt 1 ]; then
+            echo "❌ ERROR: Multiple ECS clusters found matching 'staging-demo-cluster':"
+            echo "$CLUSTER_ARNS"
+            exit 1
+          fi
+
+          CLUSTER=$(echo "$CLUSTER_ARNS" | xargs basename)
+          echo "✓ Found cluster: $CLUSTER"
+
+          # Query for service ARNs in the cluster
+          SERVICE_ARNS=$(aws ecs list-services \
+            --cluster "$CLUSTER" \
+            --region ${{ env.AWS_REGION }} \
+            --query "serviceArns" \
+            --output text)
+
+          # Validate exactly one service found
+          SERVICE_COUNT=$(echo "$SERVICE_ARNS" | wc -w)
+          if [ "$SERVICE_COUNT" -eq 0 ]; then
+            echo "❌ ERROR: No ECS service found in cluster '$CLUSTER'"
+            exit 1
+          elif [ "$SERVICE_COUNT" -gt 1 ]; then
+            echo "❌ ERROR: Multiple ECS services found in cluster '$CLUSTER':"
+            echo "$SERVICE_ARNS"
+            echo "Please specify which service to deploy"
+            exit 1
+          fi
+
+          SERVICE=$(echo "$SERVICE_ARNS" | xargs basename)
+          echo "✓ Found service: $SERVICE"
+
+          echo "🚀 Updating service $SERVICE in cluster $CLUSTER..."
 
           aws ecs update-service \
-            --cluster $CLUSTER \
-            --service $SERVICE \
+            --cluster "$CLUSTER" \
+            --service "$SERVICE" \
             --force-new-deployment \
             --region ${{ env.AWS_REGION }}
 
+          echo "⏳ Waiting for service to stabilize..."
           aws ecs wait services-stable \
-            --cluster $CLUSTER \
-            --services $SERVICE \
+            --cluster "$CLUSTER" \
+            --services "$SERVICE" \
             --region ${{ env.AWS_REGION }}
 
+          # Get ALB URL
           ALB_DNS=$(aws elbv2 describe-load-balancers \
+            --region ${{ env.AWS_REGION }} \
             --query "LoadBalancers[?contains(LoadBalancerName, 'staging-alb')].DNSName" \
             --output text)
 
+          if [ -z "$ALB_DNS" ]; then
+            echo "❌ ERROR: Could not find ALB DNS name for staging"
+            exit 1
+          fi
+
           echo "url=http://${ALB_DNS}" >> $GITHUB_OUTPUT
+          echo "✅ Deployed to Staging: http://${ALB_DNS}"
 
       - name: Run integration tests
         run: |
@@ -238,10 +341,53 @@ jobs:
       - name: Deploy to ECS
         id: deploy
         run: |
-          CLUSTER=$(aws ecs list-clusters --query "clusterArns[?contains(@, 'prod-demo-cluster')]" --output text | xargs basename)
-          SERVICE=$(aws ecs list-services --cluster $CLUSTER --query "serviceArns[0]" --output text | xargs basename)
+          set -e  # Exit on any error
 
-          echo "🚀 Deploying to PRODUCTION"
+          echo "🔍 Finding ECS cluster and service..."
+
+          # Query for cluster ARNs matching pattern
+          CLUSTER_ARNS=$(aws ecs list-clusters \
+            --region ${{ env.AWS_REGION }} \
+            --query "clusterArns[?contains(@, 'prod-demo-cluster')]" \
+            --output text)
+
+          # Validate exactly one cluster found
+          CLUSTER_COUNT=$(echo "$CLUSTER_ARNS" | wc -w)
+          if [ "$CLUSTER_COUNT" -eq 0 ]; then
+            echo "❌ ERROR: No ECS cluster found matching 'prod-demo-cluster'"
+            exit 1
+          elif [ "$CLUSTER_COUNT" -gt 1 ]; then
+            echo "❌ ERROR: Multiple ECS clusters found matching 'prod-demo-cluster':"
+            echo "$CLUSTER_ARNS"
+            exit 1
+          fi
+
+          CLUSTER=$(echo "$CLUSTER_ARNS" | xargs basename)
+          echo "✓ Found cluster: $CLUSTER"
+
+          # Query for service ARNs in the cluster
+          SERVICE_ARNS=$(aws ecs list-services \
+            --cluster $CLUSTER \
+            --region ${{ env.AWS_REGION }} \
+            --query "serviceArns" \
+            --output text)
+
+          # Validate exactly one service found
+          SERVICE_COUNT=$(echo "$SERVICE_ARNS" | wc -w)
+          if [ "$SERVICE_COUNT" -eq 0 ]; then
+            echo "❌ ERROR: No ECS service found in cluster '$CLUSTER'"
+            exit 1
+          elif [ "$SERVICE_COUNT" -gt 1 ]; then
+            echo "❌ ERROR: Multiple ECS services found in cluster '$CLUSTER':"
+            echo "$SERVICE_ARNS"
+            echo "Please specify which service to deploy"
+            exit 1
+          fi
+
+          SERVICE=$(echo "$SERVICE_ARNS" | xargs basename)
+          echo "✓ Found service: $SERVICE"
+
+          echo "🚀 Deploying to PRODUCTION - $SERVICE in cluster $CLUSTER..."
 
           aws ecs update-service \
             --cluster $CLUSTER \
@@ -249,16 +395,25 @@ jobs:
             --force-new-deployment \
             --region ${{ env.AWS_REGION }}
 
+          echo "⏳ Waiting for service to stabilize..."
           aws ecs wait services-stable \
             --cluster $CLUSTER \
             --services $SERVICE \
             --region ${{ env.AWS_REGION }}
 
+          # Get ALB URL
           ALB_DNS=$(aws elbv2 describe-load-balancers \
+            --region ${{ env.AWS_REGION }} \
             --query "LoadBalancers[?contains(LoadBalancerName, 'prod-alb')].DNSName" \
             --output text)
 
-          echo "url=https://${ALB_DNS}" >> $GITHUB_OUTPUT
+          if [ -z "$ALB_DNS" ]; then
+            echo "⚠️  WARNING: Could not find ALB DNS name"
+            echo "url=unknown" >> $GITHUB_OUTPUT
+          else
+            echo "url=https://${ALB_DNS}" >> $GITHUB_OUTPUT
+            echo "✅ Deployed to Production: https://${ALB_DNS}"
+          fi
 
       - name: Production smoke test
         run: |

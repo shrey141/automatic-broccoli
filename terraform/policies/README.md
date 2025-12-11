@@ -13,11 +13,11 @@ Policy as Code ensures:
 
 ## 📁 Directory Structure
 
-```
-terraform/policies/
-├── checkov/
-│   └── .checkov.yaml          # Checkov configuration
-└── README.md                  # This file
+```text
+ terraform/policies/
+ ├── checkov/
+ │   └── .checkov.yaml          # Checkov configuration
+ └── README.md                  # This file
 ```
 
 ## 🔧 Checkov - AWS Security Best Practices
