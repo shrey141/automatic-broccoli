@@ -3,7 +3,7 @@
 Simple demonstration API with hello-world functionality.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from flask import Blueprint, jsonify, request, current_app
 import socket
 
@@ -24,7 +24,7 @@ def hello():
         jsonify(
             {
                 "message": f"Hello, {name}!",
-                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
                 "service": current_app.config.get("APP_NAME", "demo-app"),
                 "version": current_app.config.get("APP_VERSION", "unknown"),
                 "environment": current_app.config.get("ENVIRONMENT", "unknown"),
@@ -58,7 +58,7 @@ def info():
                     "metrics_enabled": current_app.config.get("ENABLE_METRICS", False),
                     "cloudwatch_enabled": current_app.config.get("ENABLE_CLOUDWATCH", False),
                 },
-                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             }
         ),
         200,
@@ -78,7 +78,7 @@ def echo():
         jsonify(
             {
                 "echo": data,
-                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
                 "content_type": request.content_type,
             }
         ),

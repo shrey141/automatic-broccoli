@@ -6,7 +6,7 @@ Implements Kubernetes-style health probes:
 - /health/live - Liveness probe (checks if app is alive)
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from flask import Blueprint, jsonify, current_app
 
 
@@ -24,7 +24,7 @@ def health():
         jsonify(
             {
                 "status": "healthy",
-                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
                 "service": current_app.config.get("APP_NAME", "demo-app"),
                 "version": current_app.config.get("APP_VERSION", "unknown"),
                 "environment": current_app.config.get("ENVIRONMENT", "unknown"),
@@ -64,7 +64,7 @@ def ready():
             {
                 "status": "ready" if all_ready else "not_ready",
                 "checks": checks,
-                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             }
         ),
         status_code,
@@ -85,7 +85,7 @@ def live():
         jsonify(
             {
                 "status": "alive",
-                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             }
         ),
         200,

@@ -32,16 +32,3 @@ def client(app):
         Flask test client.
     """
     return app.test_client()
-
-
-@pytest.fixture
-def runner(app):
-    """Create CLI test runner.
-
-    Args:
-        app: Flask application fixture.
-
-    Returns:
-        Flask CLI test runner.
-    """
-    return app.test_cli_runner()

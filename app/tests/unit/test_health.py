@@ -1,6 +1,5 @@
 """Unit tests for health check endpoints."""
 
-import pytest
 import json
 
 
