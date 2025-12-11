@@ -12,6 +12,10 @@ on:
       - 'app/**'
       - '.github/workflows/app-ci.yml'
 
+permissions:
+  contents: read
+  security-events: write
+
 env:
   PYTHON_VERSION: '3.11'
 
@@ -132,6 +136,22 @@ jobs:
           # Cleanup
           docker stop test-container
           docker rm test-container
+
+      - name: Run Trivy container scan
+        uses: aquasecurity/trivy-action@master
+        continue-on-error: true
+        with:
+          image-ref: demo-app:${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        continue-on-error: true
+        with:
+          sarif_file: 'trivy-results.sarif'
 
   summary:
     name: CI Summary
