@@ -68,11 +68,6 @@ variable "desired_count" {
   default     = 2
 }
 
-variable "app_version" {
-  description = "Application version"
-  type        = string
-  default     = "1.0.0"
-}
 
 variable "log_retention_days" {
   description = "CloudWatch log retention in days"

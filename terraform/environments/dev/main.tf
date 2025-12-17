@@ -101,7 +101,6 @@ module "ecs_service" {
   task_cpu                 = var.ecs_task_cpu
   task_memory              = var.ecs_task_memory
   desired_count            = var.ecs_desired_count
-  app_version              = var.app_version
   log_retention_days       = 7
   autoscaling_min_capacity = 1
   autoscaling_max_capacity = 4
