@@ -19,6 +19,11 @@ FROM python:3.11-slim
 # Build argument for version (provided by CI/CD)
 ARG APP_VERSION=unknown
 
+# Install curl for health checks
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
 # Security: Create non-root user
 RUN groupadd -r appuser && useradd -r -g appuser -u 1000 appuser
 
@@ -45,9 +50,10 @@ USER appuser
 # Expose application port
 EXPOSE 8080
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/health').read()" || exit 1
+# Health check - using curl for reliability
+# Increased start-period to allow app initialization
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
 
 # Run application with gunicorn
 CMD ["gunicorn", \
