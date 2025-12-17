@@ -10,7 +10,6 @@ class Config:
     """Base configuration with sensible defaults."""
 
     # Flask
-    SECRET_KEY = os.environ.get("SECRET_KEY") or "dev-secret-key-change-in-prod"
     FLASK_ENV = os.environ.get("FLASK_ENV", "production")
 
     # Application
@@ -54,12 +53,6 @@ class ProductionConfig(Config):
 
     DEBUG = False
     LOG_LEVEL = "INFO"
-
-    # Override to ensure production security
-    def __init__(self):
-        """Initialize production config and validate required environment variables."""
-        if not os.environ.get("SECRET_KEY"):
-            raise ValueError("SECRET_KEY environment variable must be set in production")
 
 
 # Configuration mapping

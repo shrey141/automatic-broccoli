@@ -75,3 +75,4 @@ build/
 *.terraform.lock.hcl
 *tfplan
 info.txt
+app/coverage.xml

@@ -301,8 +301,8 @@ jobs:
             echo "⚠️  WARNING: Could not find ALB DNS name"
             echo "url=unknown" >> $GITHUB_OUTPUT
           else
-            echo "url=https://${ALB_DNS}" >> $GITHUB_OUTPUT
-            echo "✅ Deployed to Production: https://${ALB_DNS}"
+            echo "url=http://${ALB_DNS}" >> $GITHUB_OUTPUT
+            echo "✅ Deployed to Production: http://${ALB_DNS}"
           fi
 
       - name: Production smoke test
