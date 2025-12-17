@@ -58,12 +58,6 @@ variable "autoscaling_max_capacity" {
   default     = 10
 }
 
-variable "app_version" {
-  description = "Application version"
-  type        = string
-  default     = "1.0.0"
-}
-
 variable "alert_email" {
   description = "Email address for CloudWatch alarms (required for production)"
   type        = string

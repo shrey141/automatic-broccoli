@@ -40,12 +40,6 @@ variable "ecs_desired_count" {
   default     = 2
 }
 
-variable "app_version" {
-  description = "Application version"
-  type        = string
-  default     = "1.0.0"
-}
-
 variable "alert_email" {
   description = "Email address for CloudWatch alarms"
   type        = string

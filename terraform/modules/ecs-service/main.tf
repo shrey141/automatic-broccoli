@@ -143,10 +143,6 @@ resource "aws_ecs_task_definition" "main" {
           value = data.aws_region.current.name
         },
         {
-          name  = "APP_VERSION"
-          value = var.app_version
-        },
-        {
           name  = "ENABLE_CLOUDWATCH"
           value = "true"
         }
