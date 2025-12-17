@@ -10,6 +10,8 @@ terraform {
     }
   }
 
+  # dummy
+
   # Uncomment after creating S3 bucket and DynamoDB table for state management
   # backend "s3" {
   #   bucket         = "demo-app-terraform-state"
